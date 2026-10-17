@@ -14,12 +14,20 @@ import java.lang.invoke.MethodHandle;
 import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
+import java.util.stream.LongStream;
 
 @SuppressWarnings("restricted")
 final class Desk{
   static final boolean windows= System.getProperty("os.name").startsWith("Windows");
   static final boolean mac= System.getProperty("os.name").startsWith("Mac");
+  static final boolean managed= System.getenv("SWAYSOCK") != null
+    || Stream.of(Objects.requireNonNullElse(System.getenv("XDG_CURRENT_DESKTOP"), "").split(":")).map(d -> d.toLowerCase(Locale.ROOT)).anyMatch(List.of("hyprland", "sway", "i3")::contains);
+  static final Field peer= open(reflect(() -> Component.class.getDeclaredField("peer")));
 
   static boolean down(){
     if (windows){ return IntStream.of(1, 2, 4).anyMatch(vk -> (short)call(Win.state, vk) < 0); }
@@ -27,6 +35,25 @@ final class Desk{
     var o= X11.out;
     call(X11.query, X11.display, X11.root, o, o.asSlice(8), o.asSlice(16), o.asSlice(20), o.asSlice(24), o.asSlice(28), o.asSlice(32));
     return (o.get(ValueLayout.JAVA_INT, 32) & 0x700) != 0;
+    }
+  static boolean fullScreen(Frame f){
+    long fs= X11.atom("_NET_WM_STATE_FULLSCREEN");
+    return LongStream.of(X11.atoms(X11.window(f), "_NET_WM_STATE")).anyMatch(a -> a == fs);
+    }
+  static boolean managing(Frame f){ return X11.atoms(X11.window(f), "WM_STATE").length > 0; }
+  static void fullScreen(Frame f, boolean on){
+    try (var a= Arena.ofConfined()){
+      var e= a.allocate(192);
+      e.set(ValueLayout.JAVA_INT, 0, 33);
+      e.set(ValueLayout.JAVA_LONG, 32, X11.window(f));
+      e.set(ValueLayout.JAVA_LONG, 40, X11.atom("_NET_WM_STATE"));
+      e.set(ValueLayout.JAVA_INT, 48, 32);
+      e.set(ValueLayout.JAVA_LONG, 56, on ? 1 : 0);
+      e.set(ValueLayout.JAVA_LONG, 64, X11.atom("_NET_WM_STATE_FULLSCREEN"));
+      e.set(ValueLayout.JAVA_LONG, 80, 1);
+      call(X11.send, X11.display, X11.root, 0, (1L<<20)|(1L<<19), e);
+      call(X11.flush, X11.display);
+      }
     }
   static void restoreSize(Frame f, Rectangle r, boolean maximized){
     var gc= f.getGraphicsConfiguration();
@@ -36,7 +63,7 @@ final class Desk{
     int x= (int)Math.round((r.x-s.x-in.left)*k);
     int y= (int)Math.round((r.y-s.y-in.top)*k);
     var p= Win.placement;
-    var h= MemorySegment.ofAddress((long)reflect(() -> Win.hwnd.invoke(reflect(() -> Win.peer.get(f)))));
+    var h= MemorySegment.ofAddress((long)reflect(() -> Win.hwnd.invoke(reflect(() -> peer.get(f)))));
     p.set(ValueLayout.JAVA_INT, 0, 44);
     call(Win.getPlacement, h, p);
     p.set(ValueLayout.JAVA_INT, 8, maximized ? 3 : 1);
@@ -68,7 +95,6 @@ final class Desk{
     static final MethodHandle getPlacement= fn("user32", "GetWindowPlacement", placementCall);
     static final MethodHandle setPlacement= fn("user32", "SetWindowPlacement", placementCall);
     static final MemorySegment placement= Arena.global().allocate(44);
-    static final Field peer= open(reflect(() -> Component.class.getDeclaredField("peer")));
     static final Method hwnd= open(reflect(() -> Class.forName("sun.awt.windows.WComponentPeer").getMethod("getHWnd")));
     }
   private static final class Mac{
@@ -82,5 +108,27 @@ final class Desk{
     static final MethodHandle query= fn(lib, "XQueryPointer", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG,
       ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
     static final MemorySegment out= Arena.global().allocate(36);
+    static final MethodHandle internAtom= fn(lib, "XInternAtom", FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
+    static final MethodHandle property= fn(lib, "XGetWindowProperty", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG,
+      ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+    static final MethodHandle free= fn(lib, "XFree", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
+    static final MethodHandle send= fn(lib, "XSendEvent", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
+    static final MethodHandle flush= fn(lib, "XFlush", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
+    static final Method window= reflect(() -> Class.forName("sun.awt.X11.XBaseWindow").getMethod("getWindow"));
+    static long window(Frame f){ return (long)reflect(() -> window.invoke(reflect(() -> peer.get(f)))); }
+    static long atom(String name){
+      try (var a= Arena.ofConfined()){ return (long)call(internAtom, display, a.allocateFrom(name), 0); }
+      }
+    static long[] atoms(long w, String name){
+      try (var a= Arena.ofConfined()){
+        var n= a.allocate(8);
+        var data= a.allocate(8);
+        call(property, display, w, atom(name), 0L, 1024L, 0, 0L, a.allocate(8), a.allocate(4), n, a.allocate(8), data);
+        var p= data.get(ValueLayout.ADDRESS, 0);
+        var r= p.reinterpret(n.get(ValueLayout.JAVA_LONG, 0)*8).toArray(ValueLayout.JAVA_LONG);
+        call(free, p);
+        return r;
+        }
+      }
     }
   }

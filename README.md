@@ -23,10 +23,13 @@ closed) and uncaught exception.
 When a window seems to vanish, the log says what the program last did and what
 the desk last reported.
 
-## The four states
+## The four states of a floating desk
 
-The demo follows the state machine of the design document; the terms are the
+The demo follows the state machines of the design document; the terms are the
 ones defined there (virtual pixel space, picture, bands, content area).
+A tiling desk (Hyprland, sway, i3: `XDG_CURRENT_DESKTOP` names one of them, or
+`SWAYSOCK` is set) has its own two states, below; every other desk is a
+floating desk.
 
     State 1: FullScreen       Fearless corner, the desk's full screen.
     State 2: FearlessWindow   Fearless corner and resize handle; the window is
@@ -48,6 +51,21 @@ ones defined there (virtual pixel space, picture, bands, content area).
                              mouse button is down; a title bar drag (it moved)
                              stays in 4 and is compacted.
     In every state the picture covers at least the min screen area.
+
+## The two states of a tiling desk
+
+    State 1: FullScreen       Fearless corner, the desk's full screen.
+    State M: DeskManaged      Fearless corner; the desk chooses the size and the
+                              position, tiled or floating; bands when the aspect
+                              ratios differ.
+
+    Corner double click      1 to M, M to 1.
+    Full screen key          1 to M, M to 1.
+    The desk's full screen   1 to M, M to 1 (Super+F on Omarchy).
+    Corner drag              nothing.
+    The demo asks the desk for full screen with the `_NET_WM_STATE` message and
+    takes the state from `_NET_WM_STATE_FULLSCREEN` on each repaint tick; it
+    never sets the size or the position of the window after it opens.
 
 ## Other behaviours
 
@@ -102,8 +120,9 @@ ones defined there (virtual pixel space, picture, bands, content area).
   pipeline makes full screen an exclusive mode of the display, and on a desk
   scaled above 100% the bounds set while leaving it reach the native window
   unscaled. Run from a JDK, pass the same option, `--enable-native-access=demo`,
-  and on Windows `--add-opens java.desktop/java.awt=demo` and
-  `--add-opens java.desktop/sun.awt.windows=demo` (the window handle).
+  `--add-opens java.desktop/java.awt=demo`, and on Windows
+  `--add-opens java.desktop/sun.awt.windows=demo` (the window handle), on
+  Linux `--add-exports java.desktop/sun.awt.X11=demo` (the X11 window).
 - The windows opened by `Show` share one program, and a program has one full
   screen window: a window entering full screen first turns the full screen
   window of another `Show` into a Fearless window.
