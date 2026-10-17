@@ -25,6 +25,7 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.dnd.DragSource;
 import java.util.List;
+import java.util.Locale;
 import javax.swing.AbstractAction;
 import javax.swing.JComponent;
 import javax.swing.JFrame;
@@ -32,7 +33,7 @@ import javax.swing.KeyStroke;
 import javax.swing.Timer;
 import javax.swing.WindowConstants;
 
-final class Stage{
+final class Stage extends MouseAdapter{
   enum Mode{ decorated, fearless, fullScreen }
   static final int tickMillis= 33;
   static final int quietTicks= 8;
@@ -73,14 +74,8 @@ final class Stage{
     canvasW= c.canvasW();
     canvasH= c.canvasH();
     content= new Content(this);
-    var m= new MouseAdapter(){
-      @Override public void mousePressed(MouseEvent e){ if (e.getButton() == MouseEvent.BUTTON1){ press(e); } }
-      @Override public void mouseReleased(MouseEvent e){ if (e.getButton() == MouseEvent.BUTTON1){ release(e.getLocationOnScreen()); } }
-      @Override public void mouseDragged(MouseEvent e){ drag(e); }
-      @Override public void mouseMoved(MouseEvent e){ move(e.getPoint()); }
-      };
-    surface.addMouseListener(m);
-    surface.addMouseMotionListener(m);
+    surface.addMouseListener(this);
+    surface.addMouseMotionListener(this);
     surface.setOpaque(true);
     realize(c.opensAs(), "the program");
     timer.start();
@@ -135,7 +130,9 @@ final class Stage{
         f.setVisible(true);
         }
       case decorated -> {
-        f.setBounds(wrapped(r));
+        f.pack();
+        var in= f.getInsets();
+        f.setBounds(inset(fit(inset(r, in), r.width), new Insets(-in.top, -in.left, -in.bottom, -in.right)));
         if (maximize){ f.setExtendedState(Frame.MAXIMIZED_BOTH); }
         f.setVisible(true);
         }
@@ -143,11 +140,6 @@ final class Stage{
     f.toFront();
     surface.requestFocusInWindow();
     if (old != null && old != f){ old.dispose(); }
-    }
-  private Rectangle wrapped(Rectangle r){
-    f.pack();
-    var in= f.getInsets();
-    return inset(fit(inset(r, in), r.width), new Insets(-in.top, -in.left, -in.bottom, -in.right));
     }
   private static Rectangle inset(Rectangle r, Insets in){ return new Rectangle(r.x+in.left, r.y+in.top, r.width-in.left-in.right, r.height-in.top-in.bottom); }
   private Dimension size(double w){
@@ -167,7 +159,7 @@ final class Stage{
     if (mode == Mode.fearless || d.width == 0 || d.height == 0 || size(d.width).equals(d)){ return; }
     requests+= 1;
     double aspect= d.getWidth()/d.getHeight();
-    lastRequest= "%.3f ".formatted(aspect)+(c.acceptAspect() ? "accepted" : "rejected");
+    lastRequest= String.format(Locale.ROOT, "%.3f %s", aspect, c.acceptAspect() ? "accepted" : "rejected");
     log("aspect ratio request "+lastRequest);
     if (c.acceptAspect()){ canvasW= Math.max(1, (int)Math.round(canvasH*aspect)); }
     }
@@ -178,12 +170,8 @@ final class Stage{
     lastSize= now;
     if (quiet == quietTicks){ request(now); }
     if (watching > 0){ watch(); }
-    if (mode == Mode.fearless && translucent && c.pulse()){ f.setOpacity(opacity()); }
+    if (mode == Mode.fearless && translucent && c.pulse()){ f.setOpacity((float)(c.opacityFloor()+(1-c.opacityFloor())*(0.5+0.5*Math.cos((System.nanoTime()-t0)/0.5e9)))); }
     surface.repaint();
-    }
-  private float opacity(){
-    double t= (System.nanoTime()-t0)/1e9;
-    return (float)(c.opacityFloor()+(1-c.opacityFloor())*(0.5+0.5*Math.cos(t*2)));
     }
   private void stateChanged(WindowEvent e){
     if (e.getWindow() != f || mode != Mode.decorated){ return; }
@@ -199,7 +187,7 @@ final class Stage{
     still= at.equals(lastLocation) ? still+1 : 0;
     lastLocation= at;
     watching-= 1;
-    if (still == stillTicks){ realize(Mode.fullScreen, "unmaximize"); return; }
+    if (still > stillTicks){ realize(Mode.fullScreen, "unmaximize"); return; }
     if (watching == 0){ log("the desk is moving the window: a title bar drag, the window stays decorated"); }
     }
 
@@ -230,12 +218,14 @@ final class Stage{
   private boolean inCorner(Point p){ return mode != Mode.decorated && p.x+p.y < legs(); }
   private boolean inTip(Point p){ return mode == Mode.fearless && p.x < tip() && p.y < tip(); }
 
-  private void move(Point p){
+  @Override public void mouseMoved(MouseEvent e){
+    var p= e.getPoint();
     if (!inCorner(p)){ mouse= canvasPoint(p); }
     int cursor= !inCorner(p) ? Cursor.DEFAULT_CURSOR : inTip(p) ? Cursor.NW_RESIZE_CURSOR : Cursor.MOVE_CURSOR;
     surface.setCursor(Cursor.getPredefinedCursor(cursor));
     }
-  private void press(MouseEvent e){
+  @Override public void mousePressed(MouseEvent e){
+    if (e.getButton() != MouseEvent.BUTTON1){ return; }
     var p= canvasPoint(e.getPoint());
     if (!inCorner(e.getPoint())){ if (new Rectangle(canvasW, canvasH).contains(p)){ content.press(p); } return; }
     if (e.getClickCount() == 2){ realize(Mode.decorated, "a corner double click"); return; }
@@ -244,8 +234,8 @@ final class Stage{
     resizing= inTip(e.getPoint());
     dragged= false;
     }
-  private void drag(MouseEvent e){
-    if (pressAt == null){ move(e.getPoint()); return; }
+  @Override public void mouseDragged(MouseEvent e){
+    if (pressAt == null){ mouseMoved(e); return; }
     var p= e.getLocationOnScreen();
     if (!dragged && p.distance(pressAt) <= DragSource.getDragThreshold()){ return; }
     dragged= true;
@@ -253,11 +243,11 @@ final class Stage{
     var at= new Point(pressBounds.x+p.x-pressAt.x, pressBounds.y+p.y-pressAt.y);
     f.setBounds(resizing ? resized(at) : moved(at));
     }
-  private void release(Point p){
-    if (pressAt == null){ return; }
+  @Override public void mouseReleased(MouseEvent e){
+    if (e.getButton() != MouseEvent.BUTTON1 || pressAt == null){ return; }
     pressAt= null;
     if (!dragged || mode != Mode.fearless){ return; }
-    if (p.distance(workArea.getLocation()) <= screen.height/16){ realize(Mode.fullScreen, "a corner drop at the top left"); }
+    if (e.getLocationOnScreen().distance(workArea.getLocation()) <= screen.height/16){ realize(Mode.fullScreen, "a corner drop at the top left"); }
     }
   private Rectangle moved(Point at){
     int right= workArea.x+workArea.width;
@@ -289,9 +279,7 @@ final class Stage{
     cg.clipRect(0, 0, canvasW, canvasH);
     content.paint(cg, canvasW, canvasH);
     cg.dispose();
-    if (mode != Mode.decorated){ paintCorner(g); }
-    }
-  private void paintCorner(Graphics2D g){
+    if (mode == Mode.decorated){ return; }
     int l= legs();
     var tri= new Polygon(new int[]{0, l, 0}, new int[]{0, 0, l}, 3);
     g.setColor(new Color(28, 28, 32));
@@ -309,7 +297,7 @@ final class Stage{
     var d= surface.getSize();
     String opacity= translucent ? "" : " (translucency not supported on this desk)";
     return List.of(
-      "canvas "+canvasW+"x"+canvasH+" units, scale %.3f".formatted(scale()),
+      String.format(Locale.ROOT, "canvas %dx%d units, scale %.3f", canvasW, canvasH, scale()),
       "window content "+d.width+"x"+d.height+" px, "+state()+opacity,
       "aspect ratio requests: "+requests+", last "+lastRequest,
       "mouse "+mouse.x+", "+mouse.y+" (canvas units)");
@@ -321,6 +309,6 @@ final class Stage{
     var owner= KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
     String focus= !f.isFocused() ? "" : ", focused, keys to "+(owner == null ? "nobody" : owner.getClass().getSimpleName());
     return "#"+id+" "+c.name()+": "+state()+", window "+r.width+"x"+r.height+" at "+r.x+","+r.y+", "+shown+focus
-      +", state "+f.getExtendedState()+", opacity %.2f".formatted(f.getOpacity());
+      +", state "+f.getExtendedState()+String.format(Locale.ROOT, ", opacity %.2f", f.getOpacity());
     }
   }

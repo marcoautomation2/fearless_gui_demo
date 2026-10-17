@@ -7,8 +7,6 @@ import java.awt.GradientPaint;
 import java.awt.Graphics2D;
 import java.awt.Point;
 import java.awt.Rectangle;
-import java.awt.event.InputEvent;
-import java.awt.event.KeyEvent;
 import java.util.List;
 import javax.swing.KeyStroke;
 
@@ -30,10 +28,7 @@ final class Content{
       "Fearless window: corner drags (shrinks at the edge, full screen at the top left), tip resizes, double click decorates.",
       "Drag an edge of the desk window: when it settles, a rejected request leaves bands.");
     }
-  private static String text(KeyStroke k){
-    var m= InputEvent.getModifiersExText(k.getModifiers());
-    return (m.isEmpty() ? "" : m+"+")+KeyEvent.getKeyText(k.getKeyCode());
-    }
+  private static String text(KeyStroke k){ return k.toString().replace("pressed ", ""); }
 
   void paint(Graphics2D g, int w, int h){
     g.setPaint(new GradientPaint(0, 0, new Color(250, 250, 245), 0, h, new Color(215, 225, 240)));
