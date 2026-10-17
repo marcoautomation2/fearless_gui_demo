@@ -80,8 +80,8 @@ public final class Main{
     var name= row(p, "Name (fixed, shown before the subtitle)", new JTextField("Fearless App"));
     var screenArea= row(p, "Screen area at open, in (0, 1]", new JTextField("0.3"));
     var minArea= row(p, "Min screen area, in (0, screen area]", new JTextField("0.02"));
-    var canvasW= row(p, "Canvas width, in units", new JTextField("520"));
-    var canvasH= row(p, "Canvas height, in units", new JTextField("340"));
+    var canvasW= row(p, "Virtual pixel space width", new JTextField("520"));
+    var canvasH= row(p, "Virtual pixel space height", new JTextField("340"));
     var opensAs= row(p, "Opens as", new JComboBox<>(Stage.Mode.values()));
     var opacityFloor= row(p, "Opacity floor, in [0, 1]", new JTextField("0.4"));
     var pulse= row(p, "Pulse the opacity (Fearless window only)", new JCheckBox());
@@ -94,7 +94,7 @@ public final class Main{
     status.setForeground(Color.red);
     var show= new JButton("Show");
     show.addActionListener(_ -> open(status, () -> new Config(name.getText(), Config.number(screenArea.getText(), "Screen area"),
-      Config.number(minArea.getText(), "Min screen area"), Config.whole(canvasW.getText(), "Canvas width"), Config.whole(canvasH.getText(), "Canvas height"),
+      Config.number(minArea.getText(), "Min screen area"), Config.whole(canvasW.getText(), "Virtual pixel space width"), Config.whole(canvasH.getText(), "Virtual pixel space height"),
       opensAs.getItemAt(opensAs.getSelectedIndex()), Config.number(opacityFloor.getText(), "Opacity floor"), pulse.isSelected(),
       Config.key(closeKey.getText()), Config.key(fullScreenKey.getText()),
       acceptAspect.isSelected(), askBeforeClose.isSelected(), bands.getItemAt(bands.getSelectedIndex()).color)));

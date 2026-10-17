@@ -14,6 +14,7 @@ final class Content{
   final Stage st;
   final List<String> hints;
   final Rectangle button= new Rectangle();
+  final Rectangle swap= new Rectangle();
   final Rectangle yes= new Rectangle();
   final Rectangle no= new Rectangle();
   int clicks;
@@ -23,10 +24,10 @@ final class Content{
     this.st= st;
     hints= List.of(
       text(st.c.closeKey())+" asks to close, "+text(st.c.fullScreenKey())+" toggles full screen.",
-      "Desk window: maximize as usual; unmaximize gives full screen; a title bar drag is the desk's.",
-      "Full screen: drag the corner for a Fearless window, double click it to decorate.",
-      "Fearless window: corner drags (shrinks at the edge, full screen at the top left), tip resizes, double click decorates.",
-      "Drag an edge of the desk window: when it settles, a rejected request leaves bands.");
+      "Desk window: as on every window; after a desk resize it compacts at the next pointer or key event.",
+      "Full screen: drag the corner for a Fearless window, double click it for a desk window.",
+      "Fearless window: the corner moves (shrinks at the edge, full screen at the top left), the handle resizes.",
+      "The swap button chooses a new virtual pixel space: the window keeps its center and its area.");
     }
   private static String text(KeyStroke k){ return k.toString().replace("pressed ", ""); }
 
@@ -49,6 +50,8 @@ final class Content{
     for (var line : st.status()){ y+= 18; g.drawString(line, x, y); }
     button.setBounds(x, y+14, 160, 36);
     box(g, button, "Clicked "+clicks+" times", new Color(72, 120, 210));
+    swap.setBounds(x, y+60, 160, 36);
+    box(g, swap, "Swap width and height", new Color(72, 150, 120));
     y= h-22-16*hints.size();
     g.setColor(new Color(90, 90, 110));
     g.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 9));
@@ -82,6 +85,7 @@ final class Content{
       if (no.contains(p)){ confirm= false; }
       return;
       }
+    if (swap.contains(p)){ st.canvas(st.canvasH, st.canvasW); return; }
     if (!button.contains(p)){ return; }
     clicks+= 1;
     st.subtitle("clicks: "+clicks);

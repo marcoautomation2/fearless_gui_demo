@@ -1,5 +1,6 @@
 package demo;
 
+import java.awt.AWTEvent;
 import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
@@ -16,6 +17,7 @@ import java.awt.Polygon;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.Toolkit;
+import java.awt.event.AWTEventListener;
 import java.awt.event.ActionEvent;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
@@ -36,9 +38,6 @@ import javax.swing.WindowConstants;
 final class Stage extends MouseAdapter{
   enum Mode{ decorated, fearless, fullScreen }
   static final int tickMillis= 33;
-  static final int quietTicks= 8;
-  static final int stillTicks= 3;
-  static final int dragTicks= 8;
   final int id;
   final Config c;
   final GraphicsDevice device= GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
@@ -49,6 +48,7 @@ final class Stage extends MouseAdapter{
   final JComponent surface= new JComponent(){ @Override protected void paintComponent(Graphics g){ paintSurface((Graphics2D)g); } };
   final Content content;
   final Timer timer= new Timer(tickMillis, _ -> tick());
+  final AWTEventListener touch= this::touched;
   final long t0= System.nanoTime();
   JFrame f;
   int canvasW;
@@ -56,7 +56,9 @@ final class Stage extends MouseAdapter{
   Mode mode;
   Point mouse= new Point(-1, -1);
   Dimension lastSize= new Dimension();
-  int quiet;
+  Dimension chosen= new Dimension();
+  boolean deskResized;
+  Rectangle normal;
   int requests;
   String lastRequest= "none";
   String subtitle= "";
@@ -64,9 +66,6 @@ final class Stage extends MouseAdapter{
   Rectangle pressBounds;
   boolean resizing;
   boolean dragged;
-  int watching;
-  int still;
-  Point lastLocation;
 
   Stage(int id, Config c){
     this.id= id;
@@ -78,6 +77,7 @@ final class Stage extends MouseAdapter{
     surface.addMouseMotionListener(this);
     surface.setOpaque(true);
     realize(c.opensAs(), "the program");
+    Toolkit.getDefaultToolkit().addAWTEventListener(touch, AWTEvent.MOUSE_EVENT_MASK|AWTEvent.MOUSE_MOTION_EVENT_MASK|AWTEvent.KEY_EVENT_MASK);
     timer.start();
     }
   private JFrame makeFrame(boolean undecorated){
@@ -101,7 +101,7 @@ final class Stage extends MouseAdapter{
       @Override public void componentHidden(ComponentEvent e){ desk(e, "hidden"); }
       @Override public void componentShown(ComponentEvent e){ desk(e, "shown"); }
       });
-    frame.addWindowStateListener(this::stateChanged);
+    frame.addWindowStateListener(e -> desk(e, "in state "+e.getNewState()));
     bind(frame, c.closeKey(), () -> closeRequest("the close key"));
     bind(frame, c.fullScreenKey(), () -> realize(mode == Mode.fullScreen ? Mode.fearless : Mode.fullScreen, "the full screen key"));
     return frame;
@@ -116,12 +116,11 @@ final class Stage extends MouseAdapter{
   private void realize(Mode m, String why){
     var old= f;
     var r= old != null && mode != Mode.fullScreen ? old.getBounds() : fit(workArea, old == null ? areaWidth(c.screenArea()) : workArea.width);
-    boolean maximize= m == Mode.decorated && mode == Mode.fullScreen;
     boolean undecorated= m != Mode.decorated;
-    log((old == null ? "" : state()+" -> ")+m+(maximize ? " maximized" : "")+" by "+why);
+    log((old == null ? "" : state()+" -> ")+m+" by "+why);
     if (old == null || old.isUndecorated() != undecorated){ f= makeFrame(undecorated); }
     mode= m;
-    watching= 0;
+    deskResized= false;
     switch (m){
       case fullScreen -> {
         Main.stages.stream().filter(s -> s.f == device.getFullScreenWindow()).forEach(s -> s.realize(Mode.fearless, "#"+id+" taking full screen"));
@@ -129,13 +128,12 @@ final class Stage extends MouseAdapter{
         }
       case fearless -> {
         if (device.getFullScreenWindow() == f){ device.setFullScreenWindow(null); }
-        f.setBounds(r);
+        place(r);
         }
       case decorated -> {
         f.pack();
-        var in= f.getInsets();
-        f.setBounds(inset(fit(inset(r, in), r.width), new Insets(-in.top, -in.left, -in.bottom, -in.right)));
-        if (maximize){ f.setExtendedState(Frame.MAXIMIZED_BOTH); }
+        place(compacted(inset(r, f.getInsets())));
+        normal= f.getBounds();
         }
       }
     f.setVisible(true);
@@ -144,6 +142,22 @@ final class Stage extends MouseAdapter{
     if (old != null && old != f){ old.dispose(); }
     }
   private static Rectangle inset(Rectangle r, Insets in){ return new Rectangle(r.x+in.left, r.y+in.top, r.width-in.left-in.right, r.height-in.top-in.bottom); }
+  private static int within(int v, int low, int high){ return Math.max(low, Math.min(v, high)); }
+  private void place(Rectangle content){
+    chosen= content.getSize();
+    var in= f.getInsets();
+    f.setBounds(content.x-in.left, content.y-in.top, content.width+in.left+in.right, content.height+in.top+in.bottom);
+    }
+  private Rectangle compacted(Rectangle r){
+    var d= size(fitWidth(r.width, r.height));
+    return new Rectangle(r.x+(r.width-d.width)/2, r.y, d.width, d.height);
+    }
+  private Rectangle rescaled(Rectangle r){
+    var room= inset(workArea, f.getInsets());
+    var d= clamped(Math.sqrt(r.width*(double)r.height*canvasW/canvasH), room.width, room.height);
+    int x= within(r.x+(r.width-d.width)/2, room.x, room.x+room.width-d.width);
+    return new Rectangle(x, within(r.y+(r.height-d.height)/2, room.y, room.y+room.height-d.height), d.width, d.height);
+    }
   private Dimension size(double w){
     int iw= (int)w;
     return new Dimension(iw, (int)Math.round(iw*(double)canvasH/canvasW));
@@ -155,42 +169,47 @@ final class Stage extends MouseAdapter{
     }
   private double areaWidth(double area){ return Math.min(Math.sqrt(area*screen.width*screen.height*canvasW/canvasH), fitWidth(workArea.width, workArea.height)); }
   private Dimension clamped(double w, int roomW, int roomH){ return size(Math.max(Math.min(w, fitWidth(roomW, roomH)), areaWidth(c.minArea()))); }
-  private String state(){ return mode+((f.getExtendedState() & Frame.MAXIMIZED_BOTH) != 0 ? " maximized" : ""); }
+  private boolean maximized(){ return (f.getExtendedState() & Frame.MAXIMIZED_BOTH) != 0; }
+  private String state(){ return mode+(maximized() ? " maximized" : ""); }
 
   private void request(Dimension d){
-    if (mode == Mode.fearless || d.width == 0 || d.height == 0 || size(d.width).equals(d)){ return; }
+    if (mode == Mode.fearless || d.width == 0 || d.height == 0){ return; }
     requests+= 1;
     double aspect= d.getWidth()/d.getHeight();
     lastRequest= String.format(Locale.ROOT, "%.3f %s", aspect, c.acceptAspect() ? "accepted" : "rejected");
     log("aspect ratio request "+lastRequest);
-    if (c.acceptAspect()){ canvasW= Math.max(1, (int)Math.round(canvasH*aspect)); }
+    if (c.acceptAspect()){ canvas(Math.max(1, (int)Math.round(canvasH*aspect)), canvasH); }
+    }
+  void canvas(int w, int h){
+    if (w == canvasW && h == canvasH){ return; }
+    boolean max= maximized();
+    var old= inset(max ? normal : f.getBounds(), f.getInsets());
+    canvasW= w;
+    canvasH= h;
+    log("virtual pixel space "+w+"x"+h);
+    if (mode == Mode.fullScreen || deskResized){ return; }
+    place(rescaled(old));
+    if (!max){ return; }
+    normal= f.getBounds();
+    f.setExtendedState(Frame.MAXIMIZED_BOTH);
     }
 
   private void tick(){
     var now= surface.getSize();
-    quiet= now.equals(lastSize) ? quiet+1 : 0;
+    boolean deskWindow= mode == Mode.decorated && !maximized();
+    if (deskWindow){ normal= f.getBounds(); }
+    deskResized&= deskWindow;
+    boolean deskChose= Math.abs(now.width-chosen.width) > 1 || Math.abs(now.height-chosen.height) > 1;
+    if (!now.equals(lastSize) && deskChose){ deskResized|= deskWindow; request(now); }
     lastSize= now;
-    if (quiet == quietTicks){ request(now); }
-    if (watching > 0){ watch(); }
     if (mode == Mode.fearless && translucent && c.pulse()){ f.setOpacity((float)(c.opacityFloor()+(1-c.opacityFloor())*(0.5+0.5*Math.cos((System.nanoTime()-t0)/0.5e9)))); }
     surface.repaint();
     }
-  private void stateChanged(WindowEvent e){
-    if (e.getComponent() != f || mode != Mode.decorated){ return; }
-    boolean unmaximized= (e.getOldState() & Frame.MAXIMIZED_BOTH) != 0 && (e.getNewState() & (Frame.MAXIMIZED_BOTH|Frame.ICONIFIED)) == 0;
-    watching= unmaximized ? dragTicks : 0;
-    if (!unmaximized){ return; }
-    log("unmaximized: watching for a title bar drag");
-    still= 0;
-    lastLocation= f.getLocation();
-    }
-  private void watch(){
-    var at= f.getLocation();
-    still= at.equals(lastLocation) ? still+1 : 0;
-    lastLocation= at;
-    watching-= 1;
-    if (still == stillTicks){ realize(Mode.fullScreen, "unmaximize"); return; }
-    if (watching == 0){ log("the desk is moving the window: a title bar drag, the window stays decorated"); }
+  private void touched(AWTEvent e){
+    if (!deskResized || e.getSource() != surface){ return; }
+    deskResized= false;
+    log("the desk has finished resizing: compacting");
+    place(compacted(inset(f.getBounds(), f.getInsets())));
     }
 
   private void closeRequest(String why){
@@ -200,6 +219,7 @@ final class Stage extends MouseAdapter{
   void close(){
     log("closed by the program");
     timer.stop();
+    Toolkit.getDefaultToolkit().removeAWTEventListener(touch);
     f.dispose();
     }
   void subtitle(String s){
@@ -243,7 +263,7 @@ final class Stage extends MouseAdapter{
     dragged= true;
     if (mode == Mode.fullScreen){ realize(Mode.fearless, "a corner drag"); }
     var at= new Point(pressBounds.x+p.x-pressAt.x, pressBounds.y+p.y-pressAt.y);
-    f.setBounds(resizing ? resized(at) : moved(at));
+    place(resizing ? resized(at) : moved(at));
     }
   @Override public void mouseReleased(MouseEvent e){
     if (e.getButton() != MouseEvent.BUTTON1 || pressAt == null){ return; }
@@ -299,10 +319,10 @@ final class Stage extends MouseAdapter{
     var d= surface.getSize();
     String translucency= translucent ? "" : " (translucency not supported on this desk)";
     return List.of(
-      String.format(Locale.ROOT, "canvas %dx%d units, scale %.3f", canvasW, canvasH, scale()),
+      String.format(Locale.ROOT, "virtual pixel space %dx%d, scale %.3f", canvasW, canvasH, scale()),
       "window content "+d.width+"x"+d.height+" px, "+state()+translucency,
       "aspect ratio requests: "+requests+", last "+lastRequest,
-      "mouse "+mouse.x+", "+mouse.y+" (canvas units)");
+      "mouse "+mouse.x+", "+mouse.y+" (virtual pixels)");
     }
   String describe(){
     if (!f.isDisplayable()){ return "#"+id+" "+c.name()+": closed"; }

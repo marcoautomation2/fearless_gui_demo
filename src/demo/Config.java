@@ -15,7 +15,7 @@ record Config(String name, double screenArea, double minArea, int canvasW, int c
     if (name.isBlank()){ throw new IllegalArgumentException("The name can not be blank"); }
     if (!(screenArea > 0 && screenArea <= 1)){ throw new IllegalArgumentException("Screen area must be in (0, 1], got "+screenArea); }
     if (!(minArea > 0 && minArea <= screenArea)){ throw new IllegalArgumentException("Min screen area must be in (0, screen area], got "+minArea); }
-    if (canvasW < 50 || canvasH < 50){ throw new IllegalArgumentException("The canvas must be at least 50x50 units, got "+canvasW+"x"+canvasH); }
+    if (canvasW < 50 || canvasH < 50){ throw new IllegalArgumentException("The virtual pixel space must be at least 50x50 virtual pixels, got "+canvasW+"x"+canvasH); }
     if (!(opacityFloor >= 0 && opacityFloor <= 1)){ throw new IllegalArgumentException("Opacity floor must be in [0, 1], got "+opacityFloor); }
     if (closeKey.equals(fullScreenKey)){ throw new IllegalArgumentException("The close key and the full screen key must differ, both are "+closeKey); }
     }
