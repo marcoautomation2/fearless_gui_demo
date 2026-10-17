@@ -29,9 +29,9 @@ final class Content{
     this.picture= picture;
     hints= List.of(
       KeyEvent.getKeyText(st.c.closeKey().getKeyCode())+" asks to close, "+KeyEvent.getKeyText(st.c.fullScreenKey().getKeyCode())+" toggles full screen.",
-      "Desk window: maximize as usual; unmaximize gives full screen.",
+      "Desk window: maximize as usual; unmaximize gives full screen; a title bar drag is the desk's.",
       "Full screen: drag the corner for a Fearless window, double click it to decorate.",
-      "Fearless window: corner drags (shrinks at the screen edge), tip resizes, double click decorates.",
+      "Fearless window: corner drags (shrinks at the edge, full screen at the top left), tip resizes, double click decorates.",
       "Drag an edge of the desk window: it settles back to the canvas shape.");
     }
   private void layout(int w, int h){
@@ -63,7 +63,7 @@ final class Content{
     box(g, button, "Clicked "+clicks+" times", new Color(72, 120, 210));
     y= h-22-16*hints.size();
     g.setColor(new Color(90, 90, 110));
-    g.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 11));
+    g.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 9));
     for (var line : hints){ y+= 16; g.drawString(line, 20, y); }
     if (!confirm){ return; }
     g.setColor(new Color(0, 0, 0, 120));

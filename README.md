@@ -36,12 +36,14 @@ the desk last reported.
 |---|---|---|
 | 4 | maximizes | 3, as on every desk |
 | 4 | moves, resizes, snaps, minimizes | 4, as on every desk; a resize settles back to the canvas shape |
-| 3 | unmaximizes (button, title bar double click, key, title bar drag) | 1 |
+| 3 | unmaximizes (button, title bar double click, key) | 1 |
+| 3 | drags the title bar, which unmaximizes and moves | 4, as on every desk |
 | 3 | resizes an edge, on a desk that unmaximizes in that direction only | 3, bands while any maximized bit is set |
 | 1 | double clicks the corner | 3 |
 | 1 | drags the corner or its tip | 2, at its natural size, under the pointer, the drag going on |
 | 2 | double clicks the corner | 4, with the same bounds on screen and the same shape |
 | 2 | drags the corner | 2, moved, under the edge rule |
+| 2 | drags the corner to the top left of the work area, after being away from it | 1 |
 | 2 | drags the tip | 2, resized from the top left, bottom right fixed, canvas shape kept, never below the min size |
 | 2, 3, 4 | presses the full screen key | 1 |
 | 1 | presses the full screen key | 2, at its natural size, centered |
@@ -79,9 +81,13 @@ pointer. Dragged back to where there is room, it grows back to its natural size.
 - Full screen is asked of the desk as such (`GraphicsDevice.setFullScreenWindow`,
   the `_NET_WM_STATE_FULLSCREEN` hint on X11): a borderless window merely
   sized like the screen is kept inside the work area by GNOME.
+- The desk reports the same unmaximize for the button and for a title bar
+  drag. After the event the demo watches the window position and the pointer
+  on its repaint ticks: still for 100 ms gives full screen; movement within
+  266 ms means the desk is moving the window, which stays decorated.
 - Every swap of decorations is a new window, shown before the old one is
-  disposed, and done as soon as the desk reports the event; a desk that
-  animates its unmaximize has already started the animation by then.
+  disposed; the restored window shows for the still period plus whatever
+  unmaximize animation the desk plays before the event.
 
 ## Build
 

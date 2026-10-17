@@ -10,6 +10,7 @@ import java.awt.GraphicsConfiguration;
 import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
 import java.awt.Insets;
+import java.awt.MouseInfo;
 import java.awt.Point;
 import java.awt.Polygon;
 import java.awt.Rectangle;
@@ -34,6 +35,9 @@ final class Stage{
   enum Mode{ decorated, fearless, fullScreen }
   static final int tickMillis= 33;
   static final int quietTicks= 8;
+  static final int stillTicks= 3;
+  static final int dragTicks= 8;
+  static final int snapPixels= 20;
   final int id;
   final Config c;
   final BufferedImage icon;
@@ -64,6 +68,11 @@ final class Stage{
   Dimension natural;
   boolean resizing;
   boolean dragged;
+  boolean away;
+  int watchTicks= -1;
+  int watchQuiet;
+  Point watchPointer;
+  Point watchWindow;
 
   Stage(int id, Config c, BufferedImage icon, BufferedImage picture){
     this.id= id;
@@ -181,6 +190,7 @@ final class Stage{
     var now= surface.getSize();
     if (!now.equals(lastSeen)){ lastSeen= now; pending= true; quiet= 0; }
     else if (pending && ++quiet >= quietTicks){ pending= false; settle(); }
+    if (watchTicks >= 0){ watch(); }
     if (mode == Mode.fearless && translucent && c.pulse()){ f.setOpacity(opacity()); }
     surface.repaint();
     }
@@ -201,7 +211,23 @@ final class Stage{
     boolean was= (e.getOldState() & Frame.MAXIMIZED_BOTH) != 0;
     boolean is= (e.getNewState() & (Frame.MAXIMIZED_BOTH|Frame.ICONIFIED)) != 0;
     if (swapping || mode != Mode.decorated || !was || is){ return; }
-    realize(Mode.fullScreen, null, false, "unmaximize");
+    log("unmaximized: watching for a title bar drag");
+    watchTicks= 0;
+    watchQuiet= 0;
+    watchPointer= MouseInfo.getPointerInfo().getLocation();
+    watchWindow= f.getLocation();
+    }
+  private void watch(){
+    if (mode != Mode.decorated){ watchTicks= -1; return; }
+    var pointer= MouseInfo.getPointerInfo().getLocation();
+    var window= f.getLocation();
+    boolean still= pointer.distance(watchPointer) <= 2 && window.equals(watchWindow);
+    watchPointer= pointer;
+    watchWindow= window;
+    watchTicks+= 1;
+    watchQuiet= still ? watchQuiet+1 : 0;
+    if (watchQuiet >= stillTicks){ watchTicks= -1; realize(Mode.fullScreen, null, false, "unmaximize"); return; }
+    if (watchTicks >= dragTicks){ watchTicks= -1; log("the desk is moving the window: a title bar drag, the window stays decorated"); }
     }
 
   void toggleFullScreen(){
@@ -256,6 +282,7 @@ final class Stage{
     if (mode == Mode.fullScreen){ natural= fit(workArea).getSize(); }
     anchor= new Point(f.getX()+f.getWidth(), f.getY()+f.getHeight());
     dragged= false;
+    away= false;
     }
   private void drag(MouseEvent e){
     if (pressAt == null){ return; }
@@ -263,7 +290,13 @@ final class Stage{
     if (!dragged && p.distance(pressAt) <= 3){ return; }
     dragged= true;
     if (mode == Mode.fullScreen){ realize(Mode.fearless, place(p), false, "a corner drag"); return; }
-    f.setBounds(resizing ? resized(p) : place(p));
+    var r= resizing ? resized(p) : place(p);
+    f.setBounds(r);
+    boolean atOrigin= r.x-workArea.x <= snapPixels && r.y-workArea.y <= snapPixels;
+    if (!atOrigin){ away= true; return; }
+    if (!away || resizing){ return; }
+    pressAt= null;
+    realize(Mode.fullScreen, null, false, "a corner drag to the top left");
     }
   private Rectangle place(Point p){
     int x= Math.max(workArea.x, p.x-grip.x);
