@@ -20,7 +20,6 @@ final class Content{
   final Rectangle no= new Rectangle();
   int clicks;
   boolean confirm;
-  Point mouse= new Point(-1, -1);
 
   Content(Stage st){
     this.st= st;
@@ -43,10 +42,9 @@ final class Content{
     g.setStroke(new BasicStroke(2));
     g.drawRect(1, 1, w-2, h-2);
     var picture= Main.picture;
-    int ph= Math.max(0, h-130);
-    int pw= picture.getWidth()*ph/picture.getHeight();
-    if (pw > w/3){ pw= w/3; ph= picture.getHeight()*pw/picture.getWidth(); }
-    g.drawImage(picture, 20, 20, pw, ph, null);
+    double k= Math.max(0, Math.min((h-130d)/picture.getHeight(), w/3d/picture.getWidth()));
+    int pw= (int)(picture.getWidth()*k);
+    g.drawImage(picture, 20, 20, pw, (int)(picture.getHeight()*k), null);
     int x= 40+pw;
     int y= 40;
     g.setColor(new Color(30, 30, 50));

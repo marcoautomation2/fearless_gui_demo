@@ -24,7 +24,10 @@ record Config(String name, double screenArea, double minArea, int canvasW, int c
     if (w < 50 || h < 50){ throw new IllegalArgumentException("The canvas must be at least 50x50 units, got "+w+"x"+h); }
     double floor= number(opacityFloor, "Opacity floor");
     if (!(floor >= 0 && floor <= 1)){ throw new IllegalArgumentException("Opacity floor must be in [0, 1], got "+opacityFloor); }
-    return new Config(name, area, min, w, h, opensAs, (float)floor, pulse, key(closeKey), key(fullScreenKey), acceptAspect, askBeforeClose, bands.color);
+    var close= key(closeKey);
+    var full= key(fullScreenKey);
+    if (close.equals(full)){ throw new IllegalArgumentException("The close key and the full screen key must differ, both are "+closeKey.trim()); }
+    return new Config(name, area, min, w, h, opensAs, (float)floor, pulse, close, full, acceptAspect, askBeforeClose, bands.color);
     }
   private static double number(String s, String what){
     try{ return Double.parseDouble(s.trim()); }

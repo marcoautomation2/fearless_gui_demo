@@ -68,7 +68,8 @@ memory: what is on screen is the whole state.
   reported in canvas units.
 - The title is the fixed name, four spaces, then a subtitle the program changes
   (click the button).
-- The window opens centered, covering the given fraction of the screen area.
+- The window opens centered, covering the given fraction of the screen area,
+  capped so that it fits the work area; the min size is capped the same way.
 - Dragging an edge of the decorated window: the canvas is drawn at the fitting
   scale with bands in the leftover; when the drag settles, an aspect ratio
   request fires. With `Accept aspect ratio requests` the canvas takes the new
