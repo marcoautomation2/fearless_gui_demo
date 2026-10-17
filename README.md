@@ -89,7 +89,7 @@ memory: what is on screen is the whole state.
   sized like the screen is kept inside the work area by GNOME.
 - The desk reports the same unmaximize for the button and for a title bar
   drag. After the event the demo watches the window position on its repaint
-  ticks: still for 100 ms gives full screen; movement within
+  ticks: still for 100 ms gives full screen; no such still period within
   266 ms means the desk is moving the window, which stays decorated.
 - Every swap of decorations is a new window, shown before the old one is
   disposed; the restored window shows for the still period plus whatever

@@ -107,13 +107,13 @@ final class Stage{
       @Override public void componentShown(ComponentEvent e){ desk(frame, "shown"); }
       });
     frame.addWindowStateListener(this::stateChanged);
-    bind(frame, c.closeKey(), "close", () -> closeRequest("the close key"));
-    bind(frame, c.fullScreenKey(), "fullScreen", () -> realize(mode == Mode.fullScreen ? Mode.fearless : Mode.fullScreen, "the full screen key"));
+    bind(frame, c.closeKey(), () -> closeRequest("the close key"));
+    bind(frame, c.fullScreenKey(), () -> realize(mode == Mode.fullScreen ? Mode.fearless : Mode.fullScreen, "the full screen key"));
     return frame;
     }
-  private static void bind(JFrame frame, KeyStroke k, String name, Runnable r){
-    frame.getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(k, name);
-    frame.getRootPane().getActionMap().put(name, new AbstractAction(){ @Override public void actionPerformed(ActionEvent e){ r.run(); } });
+  private static void bind(JFrame frame, KeyStroke k, Runnable r){
+    frame.getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(k, k);
+    frame.getRootPane().getActionMap().put(k, new AbstractAction(){ @Override public void actionPerformed(ActionEvent e){ r.run(); } });
     }
   private void desk(JFrame frame, String what){ if (frame == f){ log("the desk reports the window "+what); } }
   private void log(String s){ Main.log("#"+id+" "+s); }
@@ -306,11 +306,11 @@ final class Stage{
     }
 
   List<String> status(){
-    var r= surface.getSize();
+    var d= surface.getSize();
     String opacity= translucent ? "" : " (translucency not supported on this desk)";
     return List.of(
       "canvas "+canvasW+"x"+canvasH+" units, scale %.3f".formatted(scale()),
-      "window content "+r.width+"x"+r.height+" px, "+state()+opacity,
+      "window content "+d.width+"x"+d.height+" px, "+state()+opacity,
       "aspect ratio requests: "+requests+", last "+lastRequest,
       "mouse "+mouse.x+", "+mouse.y+" (canvas units)");
     }

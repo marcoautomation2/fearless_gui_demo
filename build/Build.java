@@ -33,7 +33,6 @@ public final class Build{
     run("javac", args);
     run("jar", List.of("--create", "--file", mods.resolve("demo.jar").toString(), "-C", classes.toString(), ".", "-C", src.toString(), "demo/res"));
     run("jlink", List.of(
-      "--module-path", Path.of(System.getProperty("java.home"), "jmods").toString(),
       "--add-modules", "java.desktop",
       "--output", runtime.toString(),
       "--no-header-files", "--no-man-pages", "--strip-debug", "--compress", "zip-0"));
