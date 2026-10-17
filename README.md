@@ -16,8 +16,47 @@ The first window is the launcher: the fields are the settings a Fearless program
 fixes before the window opens.
 `Show` opens the demo window with those settings; the launcher stays, so several
 windows with different settings can be compared.
+Under the form the launcher shows each window as the program sees it (state,
+bounds, showing or not, focus, opacity), refreshed twice a second, and a log of
+every transition, aspect ratio request, desk report (shown, hidden, iconified,
+closed) and uncaught exception.
+When a window seems to vanish, the log says what the program last did and what
+the desk last reported.
 
-## What the demo window does
+## The four states
+
+1. Full screen, with the Fearless corner. Bands when the canvas and the screen
+   have different shapes.
+2. Fearless window, with the Fearless corner. Never bands: the window is always
+   the canvas at some scale.
+3. Decorated window maximized by the desk. Bands when the request is rejected.
+4. Decorated window. Bands only while an edge drag has not settled.
+
+| From | The user | To |
+|---|---|---|
+| 4 | maximizes | 3, as on every desk |
+| 4 | moves, resizes, snaps, minimizes | 4, as on every desk; a resize settles back to the canvas shape |
+| 3 | unmaximizes (button, title bar double click, key, title bar drag) | 1 |
+| 3 | resizes an edge, on a desk that unmaximizes in that direction only | 3, bands while any maximized bit is set |
+| 1 | double clicks the corner | 3 |
+| 1 | drags the corner or its tip | 2, at its natural size, under the pointer, the drag going on |
+| 2 | double clicks the corner | 4, with the same bounds on screen and the same shape |
+| 2 | drags the corner | 2, moved, under the edge rule |
+| 2 | drags the tip | 2, resized from the top left, bottom right fixed, canvas shape kept, never below the min size |
+| 2, 3, 4 | presses the full screen key | 1 |
+| 1 | presses the full screen key | 2, at its natural size, centered |
+
+The natural size of a Fearless window is the size it was given when it came into
+being (the opening size, or the largest fit in the work area when it comes out of
+full screen) or the size of its last tip resize.
+
+The edge rule: a Fearless window never leaves the work area. When a drag would
+push its bottom or right edge past the work area, the window shrinks instead,
+keeping its shape and its top left under the pointer, down to the min size
+(`Min screen area` in the launcher); at the min size it stops following the
+pointer. Dragged back to where there is room, it grows back to its natural size.
+
+## Other behaviours
 
 - The content is drawn on a reference canvas of the given size, in canvas units.
   The window shows the whole canvas, uniformly scaled; the mouse position is
@@ -29,21 +68,6 @@ windows with different settings can be compared.
   drawn at the fitting scale with bands in the leftover; when the drag settles,
   an aspect ratio request fires. With `Accept aspect ratio requests` the canvas
   takes the new shape; without it the window snaps back to the canvas shape.
-- Maximize gives a maximized decorated window (bands when the request is
-  rejected). Unmaximize gives the Fearless window: the maximized size, no title
-  bar, the Fearless corner at the top left.
-- The corner: drag it to move the window, drag its tip (the small square) to
-  resize from the top left, click it for the desk decorations (back at the
-  bounds before the maximize when the window is still the maximized size).
-- Dropping the corner within 20 pixels of the work area's top left snaps the
-  window to full screen; the full screen key toggles it too.
-- A move or resize by the corner is a program-initiated move for the desk.
-  GNOME keeps such a window fully inside the work area until the user has
-  moved it through the window manager itself, so on GNOME a Fearless window
-  the size of the work area does not move, and no window goes past the
-  screen edge by the corner; Windows has no such constraint. In full screen the
-  corner is there too: a drag on it leaves full screen with the window under
-  the pointer, a click gives a decorated window at the bounds recorded before.
 - The close key, the close button and the corner never close by themselves:
   they ask. With `Ask before closing` the question is drawn inside the canvas.
 - With `Pulse the opacity` the window opacity swings between the floor and
@@ -55,6 +79,9 @@ windows with different settings can be compared.
 - Full screen is asked of the desk as such (`GraphicsDevice.setFullScreenWindow`,
   the `_NET_WM_STATE_FULLSCREEN` hint on X11): a borderless window merely
   sized like the screen is kept inside the work area by GNOME.
+- Every swap of decorations is a new window, shown before the old one is
+  disposed, and done as soon as the desk reports the event; a desk that
+  animates its unmaximize has already started the animation by then.
 
 ## Build
 

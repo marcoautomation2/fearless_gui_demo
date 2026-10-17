@@ -29,10 +29,10 @@ final class Content{
     this.picture= picture;
     hints= List.of(
       KeyEvent.getKeyText(st.c.closeKey().getKeyCode())+" asks to close, "+KeyEvent.getKeyText(st.c.fullScreenKey().getKeyCode())+" toggles full screen.",
-      "Maximize, then unmaximize: the title bar goes, the corner comes, the size stays.",
-      "Drag the corner to move the window, drag its tip to resize, click it for the desk decorations.",
-      "Drop the corner at the top left of the screen for full screen; drag it in full screen to leave.",
-      "Drag an edge of the decorated window: it settles back to the canvas shape.");
+      "Desk window: maximize as usual; unmaximize gives full screen.",
+      "Full screen: drag the corner for a Fearless window, double click it to decorate.",
+      "Fearless window: corner drags (shrinks at the screen edge), tip resizes, double click decorates.",
+      "Drag an edge of the desk window: it settles back to the canvas shape.");
     }
   private void layout(int w, int h){
     this.w= w;
