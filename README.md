@@ -76,8 +76,8 @@ memory: what is on screen is the whole state.
   shape; without it the bands stay. The demo never resizes a decorated window:
   the end of the desk's resize drag is not reported, and bounds set while the
   desk is still resizing make the two disagree on the size of the window.
-- The close key, the close button and the corner never close by themselves:
-  they ask. With `Ask before closing` the question is drawn inside the canvas.
+- The close key and the close button never close by themselves: they ask.
+  With `Ask before closing` the question is drawn inside the canvas.
 - With `Pulse the opacity` the window opacity swings between the floor and
   opaque while it is a Fearless window, corner included; a decorated window
   and a full screen window are opaque (the toolkit refuses opacity on both).

@@ -53,7 +53,7 @@ final class Stage{
   int canvasH;
   Mode mode;
   Point mouse= new Point(-1, -1);
-  Dimension lastSeen= new Dimension();
+  Dimension lastSize= new Dimension();
   int quiet;
   int requests;
   String lastRequest= "none";
@@ -62,9 +62,9 @@ final class Stage{
   Rectangle pressBounds;
   boolean resizing;
   boolean dragged;
-  int watch;
+  int watching;
   int still;
-  Point watched;
+  Point lastLocation;
 
   Stage(int id, Config c){
     this.id= id;
@@ -124,14 +124,13 @@ final class Stage{
   private void realize(Mode m, String why){
     var r= window();
     var old= f;
-    var left= mode;
-    boolean maximize= m == Mode.decorated && left == Mode.fullScreen;
-    log((left == null ? "" : state()+" -> ")+m+(maximize ? " maximized" : "")+" by "+why);
-    boolean reuse= old != null && left != Mode.decorated && m != Mode.decorated;
+    boolean maximize= m == Mode.decorated && mode == Mode.fullScreen;
+    log((mode == null ? "" : state()+" -> ")+m+(maximize ? " maximized" : "")+" by "+why);
+    boolean reuse= old != null && mode != Mode.decorated && m != Mode.decorated;
     if (!reuse){ f= makeFrame(m != Mode.decorated); }
     windowed(f);
     mode= m;
-    watch= 0;
+    watching= 0;
     switch (m){
       case fullScreen -> device.setFullScreenWindow(f);
       case fearless -> { f.setBounds(r); f.setVisible(true); }
@@ -181,10 +180,10 @@ final class Stage{
 
   private void tick(){
     var now= surface.getSize();
-    quiet= now.equals(lastSeen) ? quiet+1 : 0;
-    lastSeen= now;
+    quiet= now.equals(lastSize) ? quiet+1 : 0;
+    lastSize= now;
     if (quiet == quietTicks){ request(now); }
-    if (watch > 0){ watch(); }
+    if (watching > 0){ watch(); }
     if (mode == Mode.fearless && translucent && c.pulse()){ f.setOpacity(opacity()); }
     surface.repaint();
     }
@@ -197,17 +196,17 @@ final class Stage{
     boolean is= (e.getNewState() & (Frame.MAXIMIZED_BOTH|Frame.ICONIFIED)) != 0;
     if (mode != Mode.decorated || !was || is){ return; }
     log("unmaximized: watching for a title bar drag");
-    watch= dragTicks;
+    watching= dragTicks;
     still= 0;
-    watched= f.getLocation();
+    lastLocation= f.getLocation();
     }
   private void watch(){
     var at= f.getLocation();
-    still= at.equals(watched) ? still+1 : 0;
-    watched= at;
-    watch-= 1;
+    still= at.equals(lastLocation) ? still+1 : 0;
+    lastLocation= at;
+    watching-= 1;
     if (still == stillTicks){ realize(Mode.fullScreen, "unmaximize"); return; }
-    if (watch == 0){ log("the desk is moving the window: a title bar drag, the window stays decorated"); }
+    if (watching == 0){ log("the desk is moving the window: a title bar drag, the window stays decorated"); }
     }
 
   private void closeRequest(String why){
@@ -245,9 +244,9 @@ final class Stage{
     }
   private void press(MouseEvent e){
     if (!inCorner(e.getPoint())){ content.press(canvasPoint(e.getPoint())); return; }
-    if (e.getClickCount() == 2){ pressAt= null; realize(Mode.decorated, "a corner double click"); return; }
+    if (e.getClickCount() == 2){ realize(Mode.decorated, "a corner double click"); return; }
     pressAt= e.getLocationOnScreen();
-    pressBounds= new Rectangle(surface.getLocationOnScreen(), surface.getSize());
+    pressBounds= f.getBounds();
     resizing= inTip(e.getPoint());
     dragged= false;
     }
@@ -279,7 +278,7 @@ final class Stage{
   private Rectangle resized(Rectangle t){
     int right= pressBounds.x+pressBounds.width;
     int bottom= pressBounds.y+pressBounds.height;
-    var d= clamped(Math.max(right-t.x, (bottom-t.y)*canvasW/(double)canvasH), right-workArea.x, bottom-workArea.y);
+    var d= clamped(Math.max(right-t.x, (bottom-t.y)*(double)canvasW/canvasH), right-workArea.x, bottom-workArea.y);
     return new Rectangle(right-d.width, bottom-d.height, d.width, d.height);
     }
 
@@ -305,7 +304,6 @@ final class Stage{
     var tri= new Polygon(new int[]{0, l, 0}, new int[]{0, 0, l}, 3);
     g.setColor(new Color(28, 28, 32));
     g.fill(tri);
-    if (mode == Mode.fearless){ g.setColor(new Color(64, 64, 70)); g.fillRect(0, 0, tip(), tip()); }
     var ig= (Graphics2D)g.create();
     ig.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
     ig.clip(tri);
@@ -313,6 +311,7 @@ final class Stage{
     int at= (int)Math.round(l*(2-Math.sqrt(2))/2)-side/2;
     ig.drawImage(Main.icon, at, at, side, side, null);
     ig.dispose();
+    if (mode == Mode.fearless){ g.setColor(new Color(64, 64, 70)); g.fillRect(0, 0, tip(), tip()); }
     }
 
   List<String> status(){

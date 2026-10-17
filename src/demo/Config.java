@@ -19,15 +19,16 @@ record Config(String name, double screenArea, double minArea, int canvasW, int c
     if (!(area > 0 && area <= 1)){ throw new IllegalArgumentException("Screen area must be in (0, 1], got "+screenArea); }
     double min= number(minArea, "Min screen area");
     if (!(min > 0 && min <= area)){ throw new IllegalArgumentException("Min screen area must be in (0, screen area], got "+minArea); }
-    int w= (int)number(canvasW, "Canvas width");
-    int h= (int)number(canvasH, "Canvas height");
-    if (w < 50 || h < 50){ throw new IllegalArgumentException("The canvas must be at least 50x50 units, got "+w+"x"+h); }
+    double w= number(canvasW, "Canvas width");
+    double h= number(canvasH, "Canvas height");
+    boolean whole= w == (int)w && h == (int)h;
+    if (!whole || w < 50 || h < 50){ throw new IllegalArgumentException("The canvas must be whole units, at least 50x50, got "+canvasW.trim()+"x"+canvasH.trim()); }
     double floor= number(opacityFloor, "Opacity floor");
     if (!(floor >= 0 && floor <= 1)){ throw new IllegalArgumentException("Opacity floor must be in [0, 1], got "+opacityFloor); }
     var close= key(closeKey);
     var full= key(fullScreenKey);
     if (close.equals(full)){ throw new IllegalArgumentException("The close key and the full screen key must differ, both are "+closeKey.trim()); }
-    return new Config(name, area, min, w, h, opensAs, (float)floor, pulse, close, full, acceptAspect, askBeforeClose, bands.color);
+    return new Config(name, area, min, (int)w, (int)h, opensAs, (float)floor, pulse, close, full, acceptAspect, askBeforeClose, bands.color);
     }
   private static double number(String s, String what){
     try{ return Double.parseDouble(s.trim()); }
