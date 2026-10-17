@@ -42,7 +42,7 @@ canvas have different shapes.
 | maximizes | whole or part | 4 to 3 |
 | drags the title bar of a maximized window | whole or part | 3 to 4 |
 | drags the corner of a full screen window | whole or part | 1 to 2, the drag going on |
-| releases the corner or the tip with the pointer within a corner's size of the top left of the work area | whole or part | 2 to 1 |
+| releases the corner or the tip with the pointer within `screenHeight/16` (the full size of the corner) of the top left of the work area | whole or part | 2 to 1 |
 | presses the full screen key | both, toward full screen | 2, 3, 4 to 1 |
 | presses the full screen key in full screen | whole or part | 1 to 2 |
 
@@ -57,8 +57,9 @@ The edge rule: a Fearless window never leaves the work area. When a drag would
 push its bottom or right edge past the work area, the window shrinks instead,
 keeping its shape and its top left under the pointer, down to the min size
 (`Min screen area` in the launcher); at the min size it stops following the
-pointer. A drag never grows the window: its size at the press is the most it can
-have during the drag, and the tip is the one way to grow it. The window has no
+pointer. A drag never grows the window: a window that shrank at the edge stays
+as small when the drag goes back into room, and the tip is the one way to grow
+it. The window has no
 memory: what is on screen is the whole state.
 
 ## Other behaviours
@@ -87,6 +88,10 @@ memory: what is on screen is the whole state.
 - Full screen is asked of the desk as such (`GraphicsDevice.setFullScreenWindow`,
   the `_NET_WM_STATE_FULLSCREEN` hint on X11): a borderless window merely
   sized like the screen is kept inside the work area by GNOME.
+  The application runs with `-Dsun.java2d.d3d=false`: on Windows the Direct3D
+  pipeline makes full screen an exclusive mode of the display, and on a desk
+  scaled above 100% the bounds set while leaving it reach the native window
+  unscaled. Run from a JDK, pass the same option.
 - The windows opened by `Show` share one program, and a program has one full
   screen window: a window entering full screen first turns the full screen
   window of another `Show` into a Fearless window.

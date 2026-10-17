@@ -241,7 +241,7 @@ final class Stage extends MouseAdapter{
     var p= e.getLocationOnScreen();
     if (!dragged && p.distance(pressAt) <= DragSource.getDragThreshold()){ return; }
     dragged= true;
-    if (mode == Mode.fullScreen){ realize(Mode.fearless, "a corner drag"); pressBounds.setSize(f.getSize()); }
+    if (mode == Mode.fullScreen){ realize(Mode.fearless, "a corner drag"); }
     var at= new Point(pressBounds.x+p.x-pressAt.x, pressBounds.y+p.y-pressAt.y);
     f.setBounds(resizing ? resized(at) : moved(at));
     }
@@ -256,7 +256,7 @@ final class Stage extends MouseAdapter{
     int bottom= workArea.y+workArea.height;
     int x= Math.max(workArea.x, at.x);
     int y= Math.max(workArea.y, at.y);
-    var d= clamped(pressBounds.width, right-x, bottom-y);
+    var d= clamped(f.getWidth(), right-x, bottom-y);
     return new Rectangle(Math.min(x, right-d.width), Math.min(y, bottom-d.height), d.width, d.height);
     }
   private Rectangle resized(Point at){

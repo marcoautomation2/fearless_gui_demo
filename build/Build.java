@@ -44,6 +44,7 @@ public final class Build{
       "--icon", icon.toString(),
       "--module-path", mods.toString(),
       "--module", "demo/demo.Main",
+      "--java-options", "-Dsun.java2d.d3d=false",
       "--runtime-image", runtime.toString()));
     if (windows){ zip(app.resolve(appName), dist.resolve(appName+"_windows.zip")); }
     else{ tar(app, dist.resolve(appName+"_linux.tar.gz")); }
