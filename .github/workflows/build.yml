@@ -1,0 +1,30 @@
+name: build
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 26
+      - run: java build/Build.java
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fearless_gui_demo_${{ runner.os }}
+          path: out/dist/*
+      - shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view demo > /dev/null 2>&1 || gh release create demo --title "Demo builds" --notes "The Linux and Windows builds of the last push to main." || true
+          gh release upload demo out/dist/* --clobber
