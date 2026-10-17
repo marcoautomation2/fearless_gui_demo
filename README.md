@@ -40,23 +40,20 @@ the desk last reported.
 | 3 | drags the title bar, which unmaximizes and moves | 4, as on every desk |
 | 3 | resizes an edge, on a desk that unmaximizes in that direction only | 3, bands while any maximized bit is set |
 | 1 | double clicks the corner | 3 |
-| 1 | drags the corner or its tip | 2, at its natural size, under the pointer, the drag going on |
+| 1 | drags the corner or its tip | 2, at the largest size that fits the work area, under the pointer, the drag going on |
 | 2 | double clicks the corner | 4, with the same bounds on screen and the same shape |
 | 2 | drags the corner | 2, moved, under the edge rule |
-| 2 | drags the corner to the top left of the work area, after being away from it | 1 |
 | 2 | drags the tip | 2, resized from the top left, bottom right fixed, canvas shape kept, never below the min size |
+| 2 | releases the corner or the tip with the pointer within a corner's size of the top left of the work area | 1 |
 | 2, 3, 4 | presses the full screen key | 1 |
-| 1 | presses the full screen key | 2, at its natural size, centered |
-
-The natural size of a Fearless window is the size it was given when it came into
-being (the opening size, or the largest fit in the work area when it comes out of
-full screen) or the size of its last tip resize.
+| 1 | presses the full screen key | 2, at the largest size that fits the work area, centered |
 
 The edge rule: a Fearless window never leaves the work area. When a drag would
 push its bottom or right edge past the work area, the window shrinks instead,
 keeping its shape and its top left under the pointer, down to the min size
 (`Min screen area` in the launcher); at the min size it stops following the
-pointer. Dragged back to where there is room, it grows back to its natural size.
+pointer. A drag never grows the window: the tip is the one way to grow it. The
+window has no memory: what is on screen is the whole state.
 
 ## Other behaviours
 

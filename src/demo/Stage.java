@@ -10,6 +10,7 @@ import java.awt.GraphicsConfiguration;
 import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
 import java.awt.Insets;
+import java.awt.KeyboardFocusManager;
 import java.awt.MouseInfo;
 import java.awt.Point;
 import java.awt.Polygon;
@@ -37,7 +38,6 @@ final class Stage{
   static final int quietTicks= 8;
   static final int stillTicks= 3;
   static final int dragTicks= 8;
-  static final int snapPixels= 20;
   final int id;
   final Config c;
   final BufferedImage icon;
@@ -65,10 +65,8 @@ final class Stage{
   Point pressAt;
   Point grip;
   Point anchor;
-  Dimension natural;
   boolean resizing;
   boolean dragged;
-  boolean away;
   int watchTicks= -1;
   int watchQuiet;
   Point watchPointer;
@@ -90,7 +88,7 @@ final class Stage{
     surface= new JComponent(){ @Override protected void paintComponent(Graphics g){ paintSurface((Graphics2D)g); } };
     var m= new MouseAdapter(){
       @Override public void mousePressed(MouseEvent e){ press(e); }
-      @Override public void mouseReleased(MouseEvent e){ pressAt= null; }
+      @Override public void mouseReleased(MouseEvent e){ release(e.getLocationOnScreen()); }
       @Override public void mouseDragged(MouseEvent e){ drag(e); }
       @Override public void mouseMoved(MouseEvent e){ move(e); }
       };
@@ -104,12 +102,15 @@ final class Stage{
     w.setIconImage(icon);
     w.setTitle(title());
     w.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
-    w.addWindowListener(new WindowAdapter(){
+    var l= new WindowAdapter(){
       @Override public void windowClosing(WindowEvent e){ closeRequest("the close button of the desk decorations"); }
       @Override public void windowClosed(WindowEvent e){ desk(w, "closed"); }
       @Override public void windowIconified(WindowEvent e){ desk(w, "iconified"); }
       @Override public void windowDeiconified(WindowEvent e){ desk(w, "deiconified"); }
-      });
+      @Override public void windowGainedFocus(WindowEvent e){ surface.requestFocusInWindow(); }
+      };
+    w.addWindowListener(l);
+    w.addWindowFocusListener(l);
     w.addComponentListener(new ComponentAdapter(){
       @Override public void componentHidden(ComponentEvent e){ desk(w, "hidden"); }
       @Override public void componentShown(ComponentEvent e){ desk(w, "shown"); }
@@ -131,7 +132,6 @@ final class Stage{
     double cap= Math.min(1, Math.min(workArea.width/w, workArea.height*canvasW/(w*canvasH)));
     var d= size(w*cap);
     var r= new Rectangle(workArea.x+(workArea.width-d.width)/2, workArea.y+(workArea.height-d.height)/2, d.width, d.height);
-    natural= d;
     realize(c.opensAs(), r, false, "open");
     timer.start();
     }
@@ -151,6 +151,7 @@ final class Stage{
       case decorated -> { decorate(r, maximized); f.setVisible(true); }
       }
     f.toFront();
+    surface.requestFocusInWindow();
     if (!reuse && old != null){ old.dispose(); }
     lastSeen= surface.getSize();
     pending= false;
@@ -199,6 +200,7 @@ final class Stage{
     return (float)(c.opacityFloor()+(1-c.opacityFloor())*(0.5+0.5*Math.sin(t*2)));
     }
   private void settle(){
+    if (mode == Mode.fearless){ return; }
     var r= contentRect();
     request(r.getWidth()/r.getHeight());
     if (mode == Mode.fullScreen || maximized()){ return; }
@@ -231,7 +233,7 @@ final class Stage{
     }
 
   void toggleFullScreen(){
-    if (mode == Mode.fullScreen){ natural= fit(workArea).getSize(); realize(Mode.fearless, fit(workArea), false, "the full screen key"); return; }
+    if (mode == Mode.fullScreen){ realize(Mode.fearless, fit(workArea), false, "the full screen key"); return; }
     realize(Mode.fullScreen, null, false, "the full screen key");
     }
   private void cornerDoubleClick(){
@@ -279,38 +281,38 @@ final class Stage{
     pressAt= e.getLocationOnScreen();
     grip= e.getPoint();
     resizing= inTip(e.getPoint());
-    if (mode == Mode.fullScreen){ natural= fit(workArea).getSize(); }
     anchor= new Point(f.getX()+f.getWidth(), f.getY()+f.getHeight());
     dragged= false;
-    away= false;
     }
   private void drag(MouseEvent e){
     if (pressAt == null){ return; }
     var p= e.getLocationOnScreen();
     if (!dragged && p.distance(pressAt) <= 3){ return; }
     dragged= true;
-    if (mode == Mode.fullScreen){ realize(Mode.fearless, place(p), false, "a corner drag"); return; }
-    var r= resizing ? resized(p) : place(p);
-    f.setBounds(r);
-    boolean atOrigin= r.x-workArea.x <= snapPixels && r.y-workArea.y <= snapPixels;
-    if (!atOrigin){ away= true; return; }
-    if (!away || resizing){ return; }
-    pressAt= null;
-    realize(Mode.fullScreen, null, false, "a corner drag to the top left");
+    if (mode == Mode.fullScreen){ realize(Mode.fearless, place(p, fit(workArea).width), false, "a corner drag"); return; }
+    f.setBounds(resizing ? resized(p) : place(p, f.getWidth()));
     }
-  private Rectangle place(Point p){
+  private void release(Point p){
+    if (pressAt == null){ return; }
+    pressAt= null;
+    if (!dragged || mode != Mode.fearless){ return; }
+    int snap= screen.height/16;
+    log("corner drag ended with the pointer at "+p.x+","+p.y+", the work area at "+workArea.x+","+workArea.y+", snap within "+snap);
+    if (p.x-workArea.x <= snap && p.y-workArea.y <= snap){ realize(Mode.fullScreen, null, false, "a corner drop at the top left"); }
+    }
+  private Rectangle place(Point p, int widthCap){
     int x= Math.max(workArea.x, p.x-grip.x);
     int y= Math.max(workArea.y, p.y-grip.y);
     double room= Math.min(workArea.x+workArea.width-x, (workArea.y+workArea.height-y)*canvasW/(double)canvasH);
-    var d= size(Math.max(Math.min(natural.width, room), minWidth()));
+    var d= size(Math.max(Math.min(widthCap, room), minWidth()));
     return new Rectangle(Math.min(x, workArea.x+workArea.width-d.width), Math.min(y, workArea.y+workArea.height-d.height), d.width, d.height);
     }
   private Rectangle resized(Point p){
     double a= canvasW/(double)canvasH;
     double w= Math.max(anchor.x-(p.x-grip.x), (anchor.y-(p.y-grip.y))*a);
     w= Math.min(w, Math.min(anchor.x-workArea.x, (anchor.y-workArea.y)*a));
-    natural= size(Math.max(w, minWidth()));
-    return new Rectangle(anchor.x-natural.width, anchor.y-natural.height, natural.width, natural.height);
+    var d= size(Math.max(w, minWidth()));
+    return new Rectangle(anchor.x-d.width, anchor.y-d.height, d.width, d.height);
     }
 
   private void paintSurface(Graphics2D g){
@@ -360,7 +362,8 @@ final class Stage{
     if (closed){ return "#"+id+" "+c.name()+": closed"; }
     var r= f.getBounds();
     String shown= f.isShowing() ? "showing" : "NOT showing";
-    String focus= f.isFocused() ? ", focused" : "";
+    var owner= KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
+    String focus= !f.isFocused() ? "" : ", focused, keys to "+(owner == null ? "nobody" : owner.getClass().getSimpleName());
     return "#"+id+" "+c.name()+": "+mode+(maximized() ? " maximized" : "")+", window "+r.width+"x"+r.height+" at "+r.x+","+r.y+", "+shown+focus
       +", state "+f.getExtendedState()+", opacity %.2f".formatted(f.getOpacity());
     }
