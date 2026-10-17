@@ -32,8 +32,8 @@ ones defined there (virtual pixel space, picture, bands, content area).
     State 2: FearlessWindow   Fearless corner and resize handle; the window is
                               the picture, so there are no bands.
     State 3: DeskMaximized    desk border, the desk's maximized state; the restore
-                              size is the largest desk window in the work area on
-                              Windows, the window before the maximize elsewhere.
+                              size is the last desk window the user saw before the
+                              maximize, whatever the virtual pixel space does after.
     State 4: DeskWindow       desk border, not maximized; the window is compacted,
                               so there are no bands once the desk has finished
                               resizing it.
@@ -69,7 +69,8 @@ ones defined there (virtual pixel space, picture, bands, content area).
   also sets the window's restore size to its current size with
   `SetWindowPlacement`, which ends a snap: Java's `setBounds` moves a snapped
   window but leaves the size from before the snap as its restore size. When
-  the desk maximizes a window, the demo sets its restore size the same way.
+  the desk maximizes a window, the demo sets its restore size to the window
+  before the maximize.
   On other desks the desk maximizes the window itself and keeps the window
   before the maximize as its restore size: GNOME restores a window mapped
   already maximized to the size it was given, but at the top left of the work
