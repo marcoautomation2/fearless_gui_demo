@@ -29,8 +29,9 @@ final class Content{
     this.picture= picture;
     hints= List.of(
       KeyEvent.getKeyText(st.c.closeKey().getKeyCode())+" asks to close, "+KeyEvent.getKeyText(st.c.fullScreenKey().getKeyCode())+" toggles full screen.",
-      "Maximize, then unmaximize: the title bar goes, the corner comes.",
-      "Drag the corner to move the window; click it for the desk decorations.",
+      "Maximize, then unmaximize: the title bar goes, the corner comes, the size stays.",
+      "Drag the corner to move the window, drag its tip to resize, click it for the desk decorations.",
+      "Drop the corner at the top left of the screen for full screen; drag it in full screen to leave.",
       "Drag an edge of the decorated window: it settles back to the canvas shape.");
     }
   private void layout(int w, int h){
@@ -60,7 +61,7 @@ final class Content{
     for (var line : st.status()){ y+= 18; g.drawString(line, x, y); }
     button.setBounds(x, y+14, 160, 36);
     box(g, button, "Clicked "+clicks+" times", new Color(72, 120, 210));
-    y= h-90;
+    y= h-22-16*hints.size();
     g.setColor(new Color(90, 90, 110));
     g.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 11));
     for (var line : hints){ y+= 16; g.drawString(line, 20, y); }

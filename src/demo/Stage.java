@@ -2,10 +2,12 @@ package demo;
 
 import java.awt.BasicStroke;
 import java.awt.Color;
+import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Frame;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.GraphicsConfiguration;
 import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
 import java.awt.Point;
@@ -23,6 +25,7 @@ import javax.swing.AbstractAction;
 import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.KeyStroke;
+import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import javax.swing.WindowConstants;
 
@@ -30,12 +33,15 @@ final class Stage{
   enum Mode{ decorated, fearless, fullScreen }
   static final int tickMillis= 33;
   static final int quietTicks= 8;
+  static final int snapPixels= 20;
+  static final int minSide= 80;
   final Config c;
   final BufferedImage icon;
-  final JFrame f= new JFrame();
-  final JComponent surface;
-  final Content content;
   final GraphicsDevice device;
+  final GraphicsConfiguration gc;
+  final JComponent surface;
+  JFrame f;
+  final Content content;
   final Rectangle screen;
   final Rectangle workArea;
   final boolean translucent;
@@ -46,16 +52,18 @@ final class Stage{
   Mode mode= Mode.decorated;
   Mode beforeFullScreen= Mode.decorated;
   Rectangle recorded;
+  Rectangle lastNormal;
+  Rectangle lastMaximized;
   Dimension lastSeen= new Dimension();
   int quiet;
   boolean pending;
-  boolean fearlessOnSettle;
   boolean realizing;
   int requests;
   double lastAspect;
   String subtitle= "";
   Point dragFrom;
-  Point windowFrom;
+  Rectangle dragStart;
+  boolean resizing;
   boolean dragged;
 
   Stage(Config c, BufferedImage icon, BufferedImage picture){
@@ -64,34 +72,38 @@ final class Stage{
     canvasW= c.canvasW();
     canvasH= c.canvasH();
     device= GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
-    var gc= device.getDefaultConfiguration();
+    gc= device.getDefaultConfiguration();
     screen= gc.getBounds();
     var in= Toolkit.getDefaultToolkit().getScreenInsets(gc);
     workArea= new Rectangle(screen.x+in.left, screen.y+in.top, screen.width-in.left-in.right, screen.height-in.top-in.bottom);
-    translucent= gc.getDevice().isWindowTranslucencySupported(GraphicsDevice.WindowTranslucency.TRANSLUCENT);
+    translucent= device.isWindowTranslucencySupported(GraphicsDevice.WindowTranslucency.TRANSLUCENT);
     content= new Content(this, picture);
     surface= new JComponent(){ @Override protected void paintComponent(Graphics g){ paintSurface((Graphics2D)g); } };
-    surface.setOpaque(true);
-    f.setContentPane(surface);
-    f.setIconImage(icon);
-    f.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
-    f.addWindowListener(new WindowAdapter(){ @Override public void windowClosing(WindowEvent e){ closeRequest(); } });
-    f.addWindowStateListener(this::stateChanged);
     var m= new MouseAdapter(){
       @Override public void mousePressed(MouseEvent e){ press(e); }
       @Override public void mouseReleased(MouseEvent e){ release(); }
       @Override public void mouseDragged(MouseEvent e){ drag(e); }
-      @Override public void mouseMoved(MouseEvent e){ content.mouse= canvasPoint(e.getPoint()); }
+      @Override public void mouseMoved(MouseEvent e){ move(e); }
       };
     surface.addMouseListener(m);
     surface.addMouseMotionListener(m);
-    bind(c.closeKey(), "close", this::closeRequest);
-    bind(c.fullScreenKey(), "fullScreen", this::toggleFullScreen);
-    title();
     }
-  private void bind(KeyStroke k, String name, Runnable r){
-    f.getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(k, name);
-    f.getRootPane().getActionMap().put(name, new AbstractAction(){ @Override public void actionPerformed(java.awt.event.ActionEvent e){ r.run(); } });
+  private JFrame makeFrame(boolean undecorated){
+    var w= new JFrame(gc);
+    w.setUndecorated(undecorated);
+    w.setContentPane(surface);
+    w.setIconImage(icon);
+    w.setTitle(title());
+    w.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
+    w.addWindowListener(new WindowAdapter(){ @Override public void windowClosing(WindowEvent e){ closeRequest(); } });
+    w.addWindowStateListener(this::stateChanged);
+    bind(w, c.closeKey(), "close", this::closeRequest);
+    bind(w, c.fullScreenKey(), "fullScreen", this::toggleFullScreen);
+    return w;
+    }
+  private static void bind(JFrame w, KeyStroke k, String name, Runnable r){
+    w.getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(k, name);
+    w.getRootPane().getActionMap().put(name, new AbstractAction(){ @Override public void actionPerformed(java.awt.event.ActionEvent e){ r.run(); } });
     }
 
   void open(){
@@ -102,6 +114,7 @@ final class Stage{
     int cw= (int)Math.round(w*cap);
     int ch= (int)Math.round(h*cap);
     var r= new Rectangle(workArea.x+(workArea.width-cw)/2, workArea.y+(workArea.height-ch)/2, cw, ch);
+    lastNormal= r;
     if (c.opensAs() == Mode.fullScreen){ recorded= r; }
     realize(c.opensAs(), r);
     timer.start();
@@ -109,12 +122,15 @@ final class Stage{
 
   void realize(Mode m, Rectangle r){
     realizing= true;
+    boolean recreate= f == null || (m == Mode.decorated) != (mode == Mode.decorated);
     if (mode == Mode.fullScreen){ device.setFullScreenWindow(null); }
-    f.dispose();
+    if (recreate){
+      if (f != null){ f.dispose(); }
+      f= makeFrame(m != Mode.decorated);
+      }
     mode= m;
-    f.setOpacity(1f);
-    f.setUndecorated(m != Mode.decorated);
     f.setExtendedState(Frame.NORMAL);
+    f.setOpacity(1f);
     if (m == Mode.fullScreen){ device.setFullScreenWindow(f); request(screen.getWidth()/screen.getHeight()); }
     else{ request(r.getWidth()/r.getHeight()); setContent(fit(r)); f.setVisible(true); }
     f.toFront();
@@ -123,6 +139,7 @@ final class Stage{
     realizing= false;
     }
   private void setContent(Rectangle r){
+    if (f.isUndecorated()){ f.setBounds(r); return; }
     surface.setPreferredSize(r.getSize());
     f.pack();
     var in= f.getInsets();
@@ -148,6 +165,7 @@ final class Stage{
     var now= surface.getSize();
     if (!now.equals(lastSeen)){ lastSeen= now; pending= true; quiet= 0; }
     else if (pending && ++quiet >= quietTicks){ pending= false; settle(); }
+    if (mode == Mode.decorated && !pending){ if (maximized()){ lastMaximized= f.getBounds(); } else{ lastNormal= contentRect(); } }
     if (mode == Mode.fearless && translucent && c.pulse()){ f.setOpacity(opacity()); }
     surface.repaint();
     }
@@ -156,7 +174,6 @@ final class Stage{
     return (float)(c.opacityFloor()+(1-c.opacityFloor())*(0.5+0.5*Math.sin(t*2)));
     }
   private void settle(){
-    if (fearlessOnSettle){ fearlessOnSettle= false; realize(Mode.fearless, contentRect()); return; }
     var r= contentRect();
     request(r.getWidth()/r.getHeight());
     if (mode == Mode.fullScreen || maximized()){ return; }
@@ -169,16 +186,27 @@ final class Stage{
     if (realizing){ return; }
     boolean was= (e.getOldState() & Frame.MAXIMIZED_BOTH) != 0;
     boolean is= (e.getNewState() & Frame.MAXIMIZED_BOTH) != 0;
-    if (was && !is && mode != Mode.fullScreen){ fearlessOnSettle= true; pending= true; quiet= 0; }
+    if (!was || is || mode == Mode.fullScreen){ return; }
+    var r= lastMaximized == null ? contentRect() : lastMaximized;
+    var later= new Timer(400, _ -> realize(Mode.fearless, r));
+    later.setRepeats(false);
+    later.start();
     }
 
   void toggleFullScreen(){
     if (mode == Mode.fullScreen){ realize(beforeFullScreen, recorded); return; }
+    enterFullScreen();
+    }
+  private void enterFullScreen(){
     beforeFullScreen= mode;
     recorded= contentRect();
     realize(Mode.fullScreen, null);
     }
-  private void cornerClick(){ realize(Mode.decorated, mode == Mode.fullScreen ? recorded : contentRect()); }
+  private void cornerClick(){
+    if (mode == Mode.fullScreen){ realize(Mode.decorated, recorded); return; }
+    var r= contentRect();
+    realize(Mode.decorated, r.equals(lastMaximized) ? lastNormal : r);
+    }
   void closeRequest(){
     if (c.askBeforeClose()){ content.confirm= true; return; }
     close();
@@ -190,9 +218,9 @@ final class Stage{
     }
   void subtitle(String s){
     subtitle= s;
-    title();
+    f.setTitle(title());
     }
-  private void title(){ f.setTitle(subtitle.isEmpty() ? c.name() : c.name()+"    "+subtitle); }
+  private String title(){ return subtitle.isEmpty() ? c.name() : c.name()+"    "+subtitle; }
 
   double scale(){ return Math.min(surface.getWidth()/(double)canvasW, surface.getHeight()/(double)canvasH); }
   private Point offset(double s){ return new Point((int)((surface.getWidth()-canvasW*s)/2), (int)((surface.getHeight()-canvasH*s)/2)); }
@@ -202,24 +230,49 @@ final class Stage{
     return new Point((int)Math.floor((p.x-o.x)/s), (int)Math.floor((p.y-o.y)/s));
     }
   private int legs(){ return Math.min(screen.height/16, surface.getHeight()/4); }
+  private int tip(){ return legs()/4; }
   private boolean inCorner(Point p){ return mode != Mode.decorated && p.x+p.y <= legs(); }
+  private boolean inTip(Point p){ return p.x <= tip() && p.y <= tip(); }
 
+  private void move(MouseEvent e){
+    content.mouse= canvasPoint(e.getPoint());
+    int cursor= !inCorner(e.getPoint()) ? Cursor.DEFAULT_CURSOR : inTip(e.getPoint()) ? Cursor.NW_RESIZE_CURSOR : Cursor.MOVE_CURSOR;
+    surface.setCursor(Cursor.getPredefinedCursor(cursor));
+    }
   private void press(MouseEvent e){
     if (!inCorner(e.getPoint())){ content.press(canvasPoint(e.getPoint())); return; }
     dragFrom= e.getLocationOnScreen();
-    windowFrom= f.getLocation();
+    dragStart= contentRect();
+    resizing= inTip(e.getPoint());
     dragged= false;
     }
   private void drag(MouseEvent e){
     if (dragFrom == null){ return; }
     var p= e.getLocationOnScreen();
-    dragged|= p.distance(dragFrom) > 3;
-    if (mode == Mode.fearless){ f.setLocation(windowFrom.x+p.x-dragFrom.x, windowFrom.y+p.y-dragFrom.y); }
+    if (!dragged && p.distance(dragFrom) <= 3){ return; }
+    dragged= true;
+    if (mode == Mode.fullScreen){ leaveFullScreenUnder(p); return; }
+    int dx= p.x-dragFrom.x;
+    int dy= p.y-dragFrom.y;
+    if (!resizing){ f.setLocation(dragStart.x+dx, dragStart.y+dy); return; }
+    int w= Math.max(minSide, dragStart.width-dx);
+    int h= Math.max(minSide, dragStart.height-dy);
+    f.setBounds(dragStart.x+dragStart.width-w, dragStart.y+dragStart.height-h, w, h);
+    }
+  private void leaveFullScreenUnder(Point p){
+    var r= new Rectangle(p.x-legs()/2, p.y-legs()/2, recorded.width, recorded.height);
+    realize(Mode.fearless, r);
+    dragFrom= p;
+    dragStart= contentRect();
+    resizing= false;
     }
   private void release(){
     if (dragFrom == null){ return; }
     dragFrom= null;
-    if (!dragged){ cornerClick(); }
+    if (!dragged){ cornerClick(); return; }
+    if (mode != Mode.fearless){ return; }
+    var r= contentRect();
+    if (r.x-workArea.x <= snapPixels && r.y-workArea.y <= snapPixels){ enterFullScreen(); recorded= dragStart; }
     }
 
   private void paintSurface(Graphics2D g){
@@ -247,11 +300,12 @@ final class Stage{
     g.setColor(new Color(255, 220, 40));
     g.setStroke(new BasicStroke(2));
     g.drawLine(l, 0, 0, l);
+    g.fillRect(0, 0, tip(), tip());
     var ig= (Graphics2D)g.create();
     ig.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
     ig.clip(tri);
-    int side= l/2-4;
-    ig.drawImage(icon, 3, 3, side, side, null);
+    int side= l/2-tip();
+    ig.drawImage(icon, tip()+2, tip()+2, side, side, null);
     ig.dispose();
     }
 

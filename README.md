@@ -30,16 +30,28 @@ windows with different settings can be compared.
   an aspect ratio request fires. With `Accept aspect ratio requests` the canvas
   takes the new shape; without it the window snaps back to the canvas shape.
 - Maximize gives a maximized decorated window (bands when the request is
-  rejected). Unmaximize gives the Fearless window: same bounds, no title bar,
-  the Fearless corner at the top left.
-- The corner: drag it to move the window, click it for the desk decorations.
-- The full screen key toggles full screen; the corner is there too, and a click
-  on it gives a decorated window at the bounds recorded before full screen.
+  rejected). Unmaximize gives the Fearless window: the maximized size, no title
+  bar, the Fearless corner at the top left.
+- The corner: drag it to move the window, drag its tip (the small square) to
+  resize from the top left, click it for the desk decorations (back at the
+  bounds before the maximize when the window is still the maximized size).
+- Dropping the corner within 20 pixels of the work area's top left snaps the
+  window to full screen; the full screen key toggles it too.
+- A move or resize by the corner is a program-initiated move for the desk.
+  GNOME keeps such a window fully inside the work area until the user has
+  moved it through the window manager itself, so on GNOME a Fearless window
+  the size of the work area does not move, and no window goes past the
+  screen edge by the corner; Windows has no such constraint. In full screen the
+  corner is there too: a drag on it leaves full screen with the window under
+  the pointer, a click gives a decorated window at the bounds recorded before.
 - The close key, the close button and the corner never close by themselves:
   they ask. With `Ask before closing` the question is drawn inside the canvas.
 - With `Pulse the opacity` the window opacity swings between the floor and
-  opaque while it is a Fearless window; a decorated window and a full screen
-  window are opaque (the toolkit refuses opacity on both).
+  opaque while it is a Fearless window, corner included; a decorated window
+  and a full screen window are opaque (the toolkit refuses opacity on both).
+  Keeping the corner opaque needs per-pixel translucency, and a per-pixel
+  translucent window repainted continuously is shown or not at random under
+  GNOME on XWayland, so the demo does not use it.
 - Full screen is asked of the desk as such (`GraphicsDevice.setFullScreenWindow`,
   the `_NET_WM_STATE_FULLSCREEN` hint on X11): a borderless window merely
   sized like the screen is kept inside the work area by GNOME.
