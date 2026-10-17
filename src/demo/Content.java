@@ -32,7 +32,7 @@ final class Content{
       "Desk window: maximize as usual; unmaximize gives full screen; a title bar drag is the desk's.",
       "Full screen: drag the corner for a Fearless window, double click it to decorate.",
       "Fearless window: corner drags (shrinks at the edge, full screen at the top left), tip resizes, double click decorates.",
-      "Drag an edge of the desk window: it settles back to the canvas shape.");
+      "Drag an edge of the desk window: when it settles, a rejected request leaves bands.");
     }
   private void layout(int w, int h){
     this.w= w;

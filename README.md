@@ -25,28 +25,33 @@ the desk last reported.
 
 ## The four states
 
-1. Full screen, with the Fearless corner. Bands when the canvas and the screen
-   have different shapes.
-2. Fearless window, with the Fearless corner. Never bands: the window is always
-   the canvas at some scale.
-3. Decorated window maximized by the desk. Bands when the request is rejected.
-4. Decorated window. Bands only while an edge drag has not settled.
-
-| From | The user | To |
+| | whole | part |
 |---|---|---|
-| 4 | maximizes | 3, as on every desk |
-| 4 | moves, resizes, snaps, minimizes | 4, as on every desk; a resize settles back to the canvas shape |
-| 3 | unmaximizes (button, title bar double click, key) | 1 |
-| 3 | drags the title bar, which unmaximizes and moves | 4, as on every desk |
-| 3 | resizes an edge, on a desk that unmaximizes in that direction only | 3, bands while any maximized bit is set |
-| 1 | double clicks the corner | 3 |
-| 1 | drags the corner or its tip | 2, at the largest size that fits the work area, under the pointer, the drag going on |
-| 2 | double clicks the corner | 4, with the same bounds on screen and the same shape |
-| 2 | drags the corner | 2, moved, under the edge rule |
-| 2 | drags the tip | 2, resized from the top left, bottom right fixed, canvas shape kept, never below the min size |
-| 2 | releases the corner or the tip with the pointer within a corner's size of the top left of the work area | 1 |
-| 2, 3, 4 | presses the full screen key | 1 |
-| 1 | presses the full screen key | 2, at the largest size that fits the work area, centered |
+| Fearless corner | 1 full screen | 2 Fearless window |
+| desk decorations | 3 decorated maximized | 4 decorated window |
+
+The demo sets the bounds of a window when it creates the window and while the
+window is a Fearless window; at no other time. So the Fearless window never
+shows bands, and the other three states show bands when the window and the
+canvas have different shapes.
+
+| The user | Changes | Transitions |
+|---|---|---|
+| double clicks the corner | the decorations | 1 to 3, 2 to 4 |
+| unmaximizes (button, title bar double click, key) | the decorations | 3 to 1 |
+| maximizes | whole or part | 4 to 3 |
+| drags the title bar of a maximized window | whole or part | 3 to 4 |
+| drags the corner of a full screen window | whole or part | 1 to 2, the drag going on |
+| releases the corner or the tip with the pointer within a corner's size of the top left of the work area | whole or part | 2 to 1 |
+| presses the full screen key | both, toward full screen | 2, 3, 4 to 1 |
+| presses the full screen key in full screen | whole or part | 1 to 2 |
+
+The window that is left gives its bounds to the new one: a full screen window
+gives the largest canvas that fits the work area, centered; any other window
+gives its own bounds. A decorated window takes them as its outer bounds, with
+the canvas fitted inside; coming from full screen it is then maximized.
+In a Fearless window the corner drag moves the window and the tip drag resizes
+it from the top left, bottom right fixed, canvas shape kept.
 
 The edge rule: a Fearless window never leaves the work area. When a drag would
 push its bottom or right edge past the work area, the window shrinks instead,
@@ -63,10 +68,12 @@ window has no memory: what is on screen is the whole state.
 - The title is the fixed name, four spaces, then a subtitle the program changes
   (click the button).
 - The window opens centered, covering the given fraction of the screen area.
-- Dragging an edge of the decorated window: while the drag lasts, the canvas is
-  drawn at the fitting scale with bands in the leftover; when the drag settles,
-  an aspect ratio request fires. With `Accept aspect ratio requests` the canvas
-  takes the new shape; without it the window snaps back to the canvas shape.
+- Dragging an edge of the decorated window: the canvas is drawn at the fitting
+  scale with bands in the leftover; when the drag settles, an aspect ratio
+  request fires. With `Accept aspect ratio requests` the canvas takes the new
+  shape; without it the bands stay. The demo never resizes a decorated window:
+  the end of the desk's resize drag is not reported, and bounds set while the
+  desk is still resizing make the two disagree on the size of the window.
 - The close key, the close button and the corner never close by themselves:
   they ask. With `Ask before closing` the question is drawn inside the canvas.
 - With `Pulse the opacity` the window opacity swings between the floor and
@@ -79,8 +86,8 @@ window has no memory: what is on screen is the whole state.
   the `_NET_WM_STATE_FULLSCREEN` hint on X11): a borderless window merely
   sized like the screen is kept inside the work area by GNOME.
 - The desk reports the same unmaximize for the button and for a title bar
-  drag. After the event the demo watches the window position and the pointer
-  on its repaint ticks: still for 100 ms gives full screen; movement within
+  drag. After the event the demo watches the window position on its repaint
+  ticks: still for 100 ms gives full screen; movement within
   266 ms means the desk is moving the window, which stays decorated.
 - Every swap of decorations is a new window, shown before the old one is
   disposed; the restored window shows for the still period plus whatever
