@@ -81,7 +81,7 @@ final class Stage{
     surface.addMouseListener(m);
     surface.addMouseMotionListener(m);
     surface.setOpaque(true);
-    realize(c.opensAs(), "open");
+    realize(c.opensAs(), "the program");
     timer.start();
     }
   private JFrame makeFrame(boolean undecorated){
@@ -93,7 +93,7 @@ final class Stage{
     frame.setTitle(title());
     frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
     var l= new WindowAdapter(){
-      @Override public void windowClosing(WindowEvent e){ closeRequest("the close button of the desk decorations"); }
+      @Override public void windowClosing(WindowEvent e){ closeRequest("the desk"); }
       @Override public void windowClosed(WindowEvent e){ desk(frame, "closed"); }
       @Override public void windowIconified(WindowEvent e){ desk(frame, "iconified"); }
       @Override public void windowDeiconified(WindowEvent e){ desk(frame, "deiconified"); }
@@ -117,12 +117,12 @@ final class Stage{
   private void desk(JFrame frame, String what){ if (frame == f){ log("the desk reports the window "+what); } }
   private void log(String s){ Main.log("#"+id+" "+s); }
 
-  private Rectangle window(){
+  private Rectangle givenBounds(){
     if (f != null && mode != Mode.fullScreen){ return f.getBounds(); }
     return fit(workArea, f == null ? areaWidth(c.screenArea()) : workArea.width);
     }
   private void realize(Mode m, String why){
-    var r= window();
+    var r= givenBounds();
     var old= f;
     boolean maximize= m == Mode.decorated && mode == Mode.fullScreen;
     log((mode == null ? "" : state()+" -> ")+m+(maximize ? " maximized" : "")+" by "+why);
@@ -131,7 +131,11 @@ final class Stage{
     watching= 0;
     switch (m){
       case fullScreen -> device.setFullScreenWindow(f);
-      case fearless -> { windowed(f); f.setBounds(r); f.setVisible(true); }
+      case fearless -> {
+        if (device.getFullScreenWindow() == f){ device.setFullScreenWindow(null); }
+        f.setBounds(r);
+        f.setVisible(true);
+        }
       case decorated -> {
         f.setBounds(wrapped(r));
         if (maximize){ f.setExtendedState(Frame.MAXIMIZED_BOTH); }
@@ -140,18 +144,12 @@ final class Stage{
       }
     f.toFront();
     surface.requestFocusInWindow();
-    if (old != null && old != f){ dispose(old); }
-    }
-  private void windowed(JFrame frame){ if (device.getFullScreenWindow() == frame){ device.setFullScreenWindow(null); } }
-  private void dispose(JFrame frame){
-    windowed(frame);
-    frame.dispose();
+    if (old != null && old != f){ old.dispose(); }
     }
   private Rectangle wrapped(Rectangle r){
     f.pack();
     var in= f.getInsets();
-    var d= fit(inset(r, in), r.width);
-    return new Rectangle(d.x-in.left, d.y-in.top, d.width+in.left+in.right, d.height+in.top+in.bottom);
+    return inset(fit(inset(r, in), r.width), new Insets(-in.top, -in.left, -in.bottom, -in.right));
     }
   private static Rectangle inset(Rectangle r, Insets in){ return new Rectangle(r.x+in.left, r.y+in.top, r.width-in.left-in.right, r.height-in.top-in.bottom); }
   private Dimension size(double w){
@@ -163,12 +161,12 @@ final class Stage{
     var d= size(Math.min(w, fitWidth(r.width, r.height)));
     return new Rectangle(r.x+(r.width-d.width)/2, r.y+(r.height-d.height)/2, d.width, d.height);
     }
-  private double areaWidth(double area){ return Math.min(Math.sqrt(area*screen.width*(double)screen.height*canvasW/canvasH), fitWidth(workArea.width, workArea.height)); }
+  private double areaWidth(double area){ return Math.min(Math.sqrt(area*screen.width*screen.height*canvasW/canvasH), fitWidth(workArea.width, workArea.height)); }
   private Dimension clamped(double w, int roomW, int roomH){ return size(Math.max(Math.min(w, fitWidth(roomW, roomH)), areaWidth(c.minArea()))); }
   private String state(){ return mode+((f.getExtendedState() & Frame.MAXIMIZED_BOTH) != 0 ? " maximized" : ""); }
 
   private void request(Dimension d){
-    if (d.width == 0 || d.height == 0 || size(d.width).equals(d)){ return; }
+    if (mode == Mode.fearless || d.width == 0 || d.height == 0 || size(d.width).equals(d)){ return; }
     requests+= 1;
     double aspect= d.getWidth()/d.getHeight();
     lastRequest= "%.3f ".formatted(aspect)+(c.acceptAspect() ? "accepted" : "rejected");
@@ -190,10 +188,11 @@ final class Stage{
     return (float)(c.opacityFloor()+(1-c.opacityFloor())*(0.5+0.5*Math.sin(t*2)));
     }
   private void stateChanged(WindowEvent e){
+    if (e.getWindow() != f || mode != Mode.decorated){ return; }
     boolean unmaximized= (e.getOldState() & Frame.MAXIMIZED_BOTH) != 0 && (e.getNewState() & (Frame.MAXIMIZED_BOTH|Frame.ICONIFIED)) == 0;
-    if (e.getWindow() != f || mode != Mode.decorated || !unmaximized){ return; }
+    watching= unmaximized ? dragTicks : 0;
+    if (!unmaximized){ return; }
     log("unmaximized: watching for a title bar drag");
-    watching= dragTicks;
     still= 0;
     lastLocation= f.getLocation();
     }
@@ -214,7 +213,7 @@ final class Stage{
   void close(){
     log("closed by the program");
     timer.stop();
-    dispose(f);
+    f.dispose();
     }
   void subtitle(String s){
     subtitle= s;

@@ -93,9 +93,11 @@ public final class Main{
     var status= new JLabel(" ");
     status.setForeground(Color.red);
     var show= new JButton("Show");
-    show.addActionListener(_ -> open(status, () -> Config.parse(name.getText(), screenArea.getText(), minArea.getText(), canvasW.getText(), canvasH.getText(),
-      opensAs.getItemAt(opensAs.getSelectedIndex()), opacityFloor.getText(), pulse.isSelected(), closeKey.getText(), fullScreenKey.getText(),
-      acceptAspect.isSelected(), askBeforeClose.isSelected(), bands.getItemAt(bands.getSelectedIndex()))));
+    show.addActionListener(_ -> open(status, () -> new Config(name.getText(), Config.number(screenArea.getText(), "Screen area"),
+      Config.number(minArea.getText(), "Min screen area"), Config.whole(canvasW.getText(), "Canvas width"), Config.whole(canvasH.getText(), "Canvas height"),
+      opensAs.getItemAt(opensAs.getSelectedIndex()), Config.number(opacityFloor.getText(), "Opacity floor"), pulse.isSelected(),
+      Config.key(closeKey.getText()), Config.key(fullScreenKey.getText()),
+      acceptAspect.isSelected(), askBeforeClose.isSelected(), bands.getItemAt(bands.getSelectedIndex()).color)));
     p.add(status);
     p.add(show);
     var all= new JPanel(new BorderLayout(0, 8));

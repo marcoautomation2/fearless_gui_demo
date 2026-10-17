@@ -63,9 +63,9 @@ final class Content{
     g.fillRect(0, 0, w, h);
     g.setColor(Color.white);
     g.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 18));
-    center(g, "Close this window?", new Rectangle(0, h/2, w, 30));
-    yes.setBounds(w/2-110, h/2+50, 100, 32);
-    no.setBounds(w/2+10, h/2+50, 100, 32);
+    center(g, "Close this window?", new Rectangle(0, h/2-41, w, 30));
+    yes.setBounds(w/2-110, h/2+9, 100, 32);
+    no.setBounds(w/2+10, h/2+9, 100, 32);
     box(g, yes, "Yes", new Color(230, 64, 48));
     box(g, no, "No", new Color(40, 170, 64));
     }
