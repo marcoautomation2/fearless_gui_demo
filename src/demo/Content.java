@@ -82,7 +82,6 @@ final class Content{
     }
 
   void press(Point p){
-    if (!new Rectangle(st.canvasW, st.canvasH).contains(p)){ return; }
     if (confirm){
       if (yes.contains(p)){ st.close(); }
       if (no.contains(p)){ confirm= false; }
@@ -91,5 +90,9 @@ final class Content{
     if (!button.contains(p)){ return; }
     clicks+= 1;
     st.subtitle("clicks: "+clicks);
+    }
+  void closeRequest(){
+    if (st.c.askBeforeClose()){ confirm= true; return; }
+    st.close();
     }
   }

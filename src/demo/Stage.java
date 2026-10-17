@@ -23,6 +23,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.awt.dnd.DragSource;
 import java.util.List;
 import javax.swing.AbstractAction;
 import javax.swing.JComponent;
@@ -73,8 +74,8 @@ final class Stage{
     canvasH= c.canvasH();
     content= new Content(this);
     var m= new MouseAdapter(){
-      @Override public void mousePressed(MouseEvent e){ press(e); }
-      @Override public void mouseReleased(MouseEvent e){ release(e.getLocationOnScreen()); }
+      @Override public void mousePressed(MouseEvent e){ if (e.getButton() == MouseEvent.BUTTON1){ press(e); } }
+      @Override public void mouseReleased(MouseEvent e){ if (e.getButton() == MouseEvent.BUTTON1){ release(e.getLocationOnScreen()); } }
       @Override public void mouseDragged(MouseEvent e){ drag(e); }
       @Override public void mouseMoved(MouseEvent e){ move(e.getPoint()); }
       };
@@ -117,16 +118,13 @@ final class Stage{
   private void desk(JFrame frame, String what){ if (frame == f){ log("the desk reports the window "+what); } }
   private void log(String s){ Main.log("#"+id+" "+s); }
 
-  private Rectangle givenBounds(){
-    if (f != null && mode != Mode.fullScreen){ return f.getBounds(); }
-    return fit(workArea, f == null ? areaWidth(c.screenArea()) : workArea.width);
-    }
   private void realize(Mode m, String why){
-    var r= givenBounds();
     var old= f;
+    var r= old != null && mode != Mode.fullScreen ? old.getBounds() : fit(workArea, old == null ? areaWidth(c.screenArea()) : workArea.width);
     boolean maximize= m == Mode.decorated && mode == Mode.fullScreen;
-    log((mode == null ? "" : state()+" -> ")+m+(maximize ? " maximized" : "")+" by "+why);
-    if (old == null || mode == Mode.decorated || m == Mode.decorated){ f= makeFrame(m != Mode.decorated); }
+    boolean undecorated= m != Mode.decorated;
+    log((old == null ? "" : state()+" -> ")+m+(maximize ? " maximized" : "")+" by "+why);
+    if (old == null || old.isUndecorated() != undecorated){ f= makeFrame(undecorated); }
     mode= m;
     watching= 0;
     switch (m){
@@ -185,7 +183,7 @@ final class Stage{
     }
   private float opacity(){
     double t= (System.nanoTime()-t0)/1e9;
-    return (float)(c.opacityFloor()+(1-c.opacityFloor())*(0.5+0.5*Math.sin(t*2)));
+    return (float)(c.opacityFloor()+(1-c.opacityFloor())*(0.5+0.5*Math.cos(t*2)));
     }
   private void stateChanged(WindowEvent e){
     if (e.getWindow() != f || mode != Mode.decorated){ return; }
@@ -207,8 +205,7 @@ final class Stage{
 
   private void closeRequest(String why){
     log("close requested by "+why);
-    if (c.askBeforeClose()){ content.confirm= true; return; }
-    close();
+    content.closeRequest();
     }
   void close(){
     log("closed by the program");
@@ -239,7 +236,8 @@ final class Stage{
     surface.setCursor(Cursor.getPredefinedCursor(cursor));
     }
   private void press(MouseEvent e){
-    if (!inCorner(e.getPoint())){ content.press(canvasPoint(e.getPoint())); return; }
+    var p= canvasPoint(e.getPoint());
+    if (!inCorner(e.getPoint())){ if (new Rectangle(canvasW, canvasH).contains(p)){ content.press(p); } return; }
     if (e.getClickCount() == 2){ realize(Mode.decorated, "a corner double click"); return; }
     pressAt= e.getLocationOnScreen();
     pressBounds= f.getBounds();
@@ -249,7 +247,7 @@ final class Stage{
   private void drag(MouseEvent e){
     if (pressAt == null){ move(e.getPoint()); return; }
     var p= e.getLocationOnScreen();
-    if (!dragged && p.distance(pressAt) <= 3){ return; }
+    if (!dragged && p.distance(pressAt) <= DragSource.getDragThreshold()){ return; }
     dragged= true;
     if (mode == Mode.fullScreen){ realize(Mode.fearless, "a corner drag"); pressBounds.setSize(f.getSize()); }
     var at= new Point(pressBounds.x+p.x-pressAt.x, pressBounds.y+p.y-pressAt.y);
