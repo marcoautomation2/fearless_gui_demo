@@ -16,14 +16,14 @@ record Config(String name, double screenArea, double minArea, int canvasW, int c
     boolean acceptAspect, boolean askBeforeClose, Bands bands){
     if (name.isBlank()){ throw new IllegalArgumentException("The name can not be blank"); }
     double area= number(screenArea, "Screen area");
-    if (area <= 0 || area > 1){ throw new IllegalArgumentException("Screen area must be in (0, 1], got "+screenArea); }
+    if (!(area > 0 && area <= 1)){ throw new IllegalArgumentException("Screen area must be in (0, 1], got "+screenArea); }
     double min= number(minArea, "Min screen area");
-    if (min <= 0 || min > area){ throw new IllegalArgumentException("Min screen area must be in (0, screen area], got "+minArea); }
+    if (!(min > 0 && min <= area)){ throw new IllegalArgumentException("Min screen area must be in (0, screen area], got "+minArea); }
     int w= (int)number(canvasW, "Canvas width");
     int h= (int)number(canvasH, "Canvas height");
     if (w < 50 || h < 50){ throw new IllegalArgumentException("The canvas must be at least 50x50 units, got "+w+"x"+h); }
     double floor= number(opacityFloor, "Opacity floor");
-    if (floor < 0 || floor > 1){ throw new IllegalArgumentException("Opacity floor must be in [0, 1], got "+opacityFloor); }
+    if (!(floor >= 0 && floor <= 1)){ throw new IllegalArgumentException("Opacity floor must be in [0, 1], got "+opacityFloor); }
     return new Config(name, area, min, w, h, opensAs, (float)floor, pulse, key(closeKey), key(fullScreenKey), acceptAspect, askBeforeClose, bands.color);
     }
   private static double number(String s, String what){

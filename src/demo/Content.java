@@ -7,48 +7,43 @@ import java.awt.GradientPaint;
 import java.awt.Graphics2D;
 import java.awt.Point;
 import java.awt.Rectangle;
+import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
-import java.awt.image.BufferedImage;
 import java.util.List;
+import javax.swing.KeyStroke;
 
 final class Content{
   final Stage st;
-  final BufferedImage picture;
   final List<String> hints;
   final Rectangle button= new Rectangle();
   final Rectangle yes= new Rectangle();
   final Rectangle no= new Rectangle();
-  int w;
-  int h;
   int clicks;
   boolean confirm;
   Point mouse= new Point(-1, -1);
 
-  Content(Stage st, BufferedImage picture){
+  Content(Stage st){
     this.st= st;
-    this.picture= picture;
     hints= List.of(
-      KeyEvent.getKeyText(st.c.closeKey().getKeyCode())+" asks to close, "+KeyEvent.getKeyText(st.c.fullScreenKey().getKeyCode())+" toggles full screen.",
+      text(st.c.closeKey())+" asks to close, "+text(st.c.fullScreenKey())+" toggles full screen.",
       "Desk window: maximize as usual; unmaximize gives full screen; a title bar drag is the desk's.",
       "Full screen: drag the corner for a Fearless window, double click it to decorate.",
       "Fearless window: corner drags (shrinks at the edge, full screen at the top left), tip resizes, double click decorates.",
       "Drag an edge of the desk window: when it settles, a rejected request leaves bands.");
     }
-  private void layout(int w, int h){
-    this.w= w;
-    this.h= h;
-    yes.setBounds(w/2-110, h/2+50, 100, 32);
-    no.setBounds(w/2+10, h/2+50, 100, 32);
+  private static String text(KeyStroke k){
+    var m= InputEvent.getModifiersExText(k.getModifiers());
+    return (m.isEmpty() ? "" : m+"+")+KeyEvent.getKeyText(k.getKeyCode());
     }
 
   void paint(Graphics2D g, int w, int h){
-    layout(w, h);
     g.setPaint(new GradientPaint(0, 0, new Color(250, 250, 245), 0, h, new Color(215, 225, 240)));
     g.fillRect(0, 0, w, h);
     g.setColor(new Color(60, 60, 80));
     g.setStroke(new BasicStroke(2));
     g.drawRect(1, 1, w-2, h-2);
-    int ph= h-130;
+    var picture= Main.picture;
+    int ph= Math.max(0, h-130);
     int pw= picture.getWidth()*ph/picture.getHeight();
     if (pw > w/3){ pw= w/3; ph= picture.getHeight()*pw/picture.getWidth(); }
     g.drawImage(picture, 20, 20, pw, ph, null);
@@ -71,6 +66,8 @@ final class Content{
     g.setColor(Color.white);
     g.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 18));
     center(g, "Close this window?", new Rectangle(0, h/2, w, 30));
+    yes.setBounds(w/2-110, h/2+50, 100, 32);
+    no.setBounds(w/2+10, h/2+50, 100, 32);
     box(g, yes, "Yes", new Color(230, 64, 48));
     box(g, no, "No", new Color(40, 170, 64));
     }
@@ -87,7 +84,7 @@ final class Content{
     }
 
   void press(Point p){
-    if (p.x < 0 || p.y < 0 || p.x >= w || p.y >= h){ return; }
+    if (!new Rectangle(st.canvasW, st.canvasH).contains(p)){ return; }
     if (confirm){
       if (yes.contains(p)){ st.close(); }
       if (no.contains(p)){ confirm= false; }

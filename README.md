@@ -57,8 +57,9 @@ The edge rule: a Fearless window never leaves the work area. When a drag would
 push its bottom or right edge past the work area, the window shrinks instead,
 keeping its shape and its top left under the pointer, down to the min size
 (`Min screen area` in the launcher); at the min size it stops following the
-pointer. A drag never grows the window: the tip is the one way to grow it. The
-window has no memory: what is on screen is the whole state.
+pointer. A drag never grows the window: its size at the press is the most it can
+have during the drag, and the tip is the one way to grow it. The window has no
+memory: what is on screen is the whole state.
 
 ## Other behaviours
 
