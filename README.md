@@ -32,7 +32,8 @@ ones defined there (virtual pixel space, picture, bands, content area).
     State 2: FearlessWindow   Fearless corner and resize handle; the window is
                               the picture, so there are no bands.
     State 3: DeskMaximized    desk border, the desk's maximized state; the restore
-                              size is the largest desk window in the work area.
+                              size is the largest desk window in the work area on
+                              Windows, the window before the maximize elsewhere.
     State 4: DeskWindow       desk border, not maximized; the window is compacted,
                               so there are no bands once the desk has finished
                               resizing it.
@@ -40,9 +41,9 @@ ones defined there (virtual pixel space, picture, bands, content area).
     Corner drag              1 to 2, the drag going on; in 2 it moves the window.
     Resize handle drag       in 2 it resizes the window, bottom right fixed.
     Release within screenHeight/16 of the top left of the work area: 2 to 1.
-    Corner double click      1 to 4, 2 to 4.
+    Corner double click      1 to 4, 2 to 4, on the release of the second click.
     Full screen key          1 to 2; 2, 3, 4 to 1.
-    Desk maximize            4 to 3: a new window, maximized.
+    Desk maximize            4 to 3.
     Desk unmaximize          3 to 1 when the window has not moved by the time no
                              mouse button is down; a title bar drag (it moved)
                              stays in 4 and is compacted.
@@ -69,7 +70,21 @@ ones defined there (virtual pixel space, picture, bands, content area).
   `SetWindowPlacement`, which ends a snap: Java's `setBounds` moves a snapped
   window but leaves the size from before the snap as its restore size. When
   the desk maximizes a window, the demo sets its restore size the same way.
-  On other desks a maximize replaces the window with a new maximized one.
+  On other desks the desk maximizes the window itself and keeps the window
+  before the maximize as its restore size: GNOME restores a window mapped
+  already maximized to the size it was given, but at the top left of the work
+  area. A window the desk tiles to half the screen is maximized vertically
+  only, and stays a desk window.
+- A new window replaces the old one when the window moves between the desk
+  border and the Fearless corner. On Windows the new window is shown first and
+  the old one is disposed after. Elsewhere the old one is disposed first: under
+  GNOME a new undecorated window shown while the old one still has the keyboard
+  can end up never receiving the keyboard. The toolkit answers the desk's offer
+  of the keyboard without asking the X server when it already counts the window
+  as focused, and the desk then never sees the window accept.
+- The corner double click acts on the release of the second click: a window
+  replaced while a button is down leaves XWayland reporting that button down
+  until the pointer next enters one of its windows.
 - A desk window has the desk's minimum size: the smallest window whose picture
   covers the min screen area. The Windows peer of the toolkit hands the desk
   the minimum size in user space, and the desk reads it in device pixels, so

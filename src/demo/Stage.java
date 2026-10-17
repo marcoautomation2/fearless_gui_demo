@@ -122,9 +122,10 @@ final class Stage extends MouseAdapter{
     var old= f;
     var r= old != null && mode != Mode.fullScreen ? old.getBounds() : fit(workArea, old == null ? areaWidth(c.screenArea()) : workArea.width);
     boolean undecorated= m != Mode.decorated;
-    boolean maximize= old != null && maximized();
-    log((old == null ? "" : state()+" -> ")+m+(maximize && m == Mode.decorated ? " maximized" : "")+" by "+why);
-    if (old == null || old.isUndecorated() != undecorated || maximize){ f= makeFrame(undecorated); }
+    log((old == null ? "" : state()+" -> ")+m+" by "+why);
+    if (old == null || old.isUndecorated() != undecorated){ f= makeFrame(undecorated); }
+    boolean replaced= old != null && old != f;
+    if (replaced && !Desk.windows){ old.dispose(); }
     mode= m;
     deskResized= false;
     unmaximized= false;
@@ -140,14 +141,13 @@ final class Stage extends MouseAdapter{
       case decorated -> {
         f.pack();
         place(compacted(inset(r, f.getInsets())));
-        if (maximize){ restore= f.getBounds(); f.setExtendedState(Frame.MAXIMIZED_BOTH); }
         }
       }
     minimum();
     f.setVisible(true);
     f.toFront();
     surface.requestFocusInWindow();
-    if (old != null && old != f){ old.dispose(); }
+    if (replaced && Desk.windows){ old.dispose(); }
     }
   private static Rectangle inset(Rectangle r, Insets in){ return new Rectangle(r.x+in.left, r.y+in.top, r.width-in.left-in.right, r.height-in.top-in.bottom); }
   private static int within(int v, int low, int high){ return Math.max(low, Math.min(v, high)); }
@@ -160,6 +160,7 @@ final class Stage extends MouseAdapter{
     placing= true;
     f.setBounds(outset(content));
     placing= false;
+    restore= f.getBounds();
     }
   private void minimum(){
     var in= f.getInsets();
@@ -187,7 +188,7 @@ final class Stage extends MouseAdapter{
     }
   private double areaWidth(double area){ return Math.min(Math.sqrt(area*screen.width*screen.height*canvasW/canvasH), fitWidth(workArea.width, workArea.height)); }
   private Dimension clamped(double w, int roomW, int roomH){ return size(Math.max(Math.min(w, fitWidth(roomW, roomH)), areaWidth(c.minArea()))); }
-  private boolean maximized(){ return (f.getExtendedState() & Frame.MAXIMIZED_BOTH) != 0; }
+  private boolean maximized(){ return (f.getExtendedState() & Frame.MAXIMIZED_BOTH) == Frame.MAXIMIZED_BOTH; }
   private String state(){ return mode+(maximized() ? " maximized" : ""); }
 
   private void request(Dimension d){
@@ -213,6 +214,7 @@ final class Stage extends MouseAdapter{
     var now= surface.getSize();
     boolean deskWindow= mode == Mode.decorated && !maximized();
     deskResized&= deskWindow;
+    if (deskWindow && f.getSize().equals(restore.getSize())){ restore= f.getBounds(); }
     boolean deskChose= !near(now.width, chosen.width) || !near(now.height, chosen.height);
     if (!now.equals(lastSize) && deskChose){ deskResized|= deskWindow; request(now); }
     lastSize= now;
@@ -224,10 +226,9 @@ final class Stage extends MouseAdapter{
   private void stateChanged(WindowEvent e){
     if (e.getComponent() != f || mode != Mode.decorated){ return; }
     desk(e, "in state "+e.getNewState());
-    boolean was= (e.getOldState() & Frame.MAXIMIZED_BOTH) != 0;
-    boolean is= (e.getNewState() & Frame.MAXIMIZED_BOTH) != 0;
+    boolean was= (e.getOldState() & Frame.MAXIMIZED_BOTH) == Frame.MAXIMIZED_BOTH;
+    boolean is= (e.getNewState() & Frame.MAXIMIZED_BOTH) == Frame.MAXIMIZED_BOTH;
     if (!was && is && Desk.windows){ restore= outset(compacted(inset(fit(workArea, workArea.width), f.getInsets()))); Desk.restoreSize(f, restore, true); return; }
-    if (!was && is){ realize(Mode.decorated, "the desk's maximize"); return; }
     unmaximized= was && !is && (e.getNewState() & Frame.ICONIFIED) == 0;
     }
   private static boolean near(int a, int b){ return Math.abs(a-b) <= 1; }
@@ -283,7 +284,7 @@ final class Stage extends MouseAdapter{
     if (e.getButton() != MouseEvent.BUTTON1){ return; }
     var p= canvasPoint(e.getPoint());
     if (!inCorner(e.getPoint())){ if (new Rectangle(canvasW, canvasH).contains(p)){ content.press(p); } return; }
-    if (e.getClickCount() == 2){ realize(Mode.decorated, "a corner double click"); return; }
+    if (e.getClickCount() == 2){ return; }
     pressAt= e.getLocationOnScreen();
     pressBounds= f.getBounds();
     resizing= inTip(e.getPoint());
@@ -299,7 +300,9 @@ final class Stage extends MouseAdapter{
     place(resizing ? resized(at) : moved(at));
     }
   @Override public void mouseReleased(MouseEvent e){
-    if (e.getButton() != MouseEvent.BUTTON1 || pressAt == null){ return; }
+    if (e.getButton() != MouseEvent.BUTTON1){ return; }
+    if (e.getClickCount() == 2 && inCorner(e.getPoint())){ realize(Mode.decorated, "a corner double click"); return; }
+    if (pressAt == null){ return; }
     pressAt= null;
     if (!dragged || mode != Mode.fearless){ return; }
     if (e.getLocationOnScreen().distance(workArea.getLocation()) <= screen.height/16){ realize(Mode.fullScreen, "a corner drop at the top left"); }
