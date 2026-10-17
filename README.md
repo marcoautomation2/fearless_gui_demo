@@ -31,7 +31,8 @@ ones defined there (virtual pixel space, picture, bands, content area).
     State 1: FullScreen       Fearless corner, the desk's full screen.
     State 2: FearlessWindow   Fearless corner and resize handle; the window is
                               the picture, so there are no bands.
-    State 3: DeskMaximized    desk border, the desk's maximized state.
+    State 3: DeskMaximized    desk border, the desk's maximized state; the restore
+                              size is the largest desk window in the work area.
     State 4: DeskWindow       desk border, not maximized; the window is compacted,
                               so there are no bands once the desk has finished
                               resizing it.
@@ -41,7 +42,11 @@ ones defined there (virtual pixel space, picture, bands, content area).
     Release within screenHeight/16 of the top left of the work area: 2 to 1.
     Corner double click      1 to 4, 2 to 4.
     Full screen key          1 to 2; 2, 3, 4 to 1.
-    Desk gestures            4 to 3 and 3 to 4, as on every window.
+    Desk maximize            4 to 3: a new window, maximized.
+    Desk unmaximize          3 to 1 when the window has not moved by the time no
+                             mouse button is down; a title bar drag (it moved)
+                             stays in 4 and is compacted.
+    In every state the picture covers at least the min screen area.
 
 ## Other behaviours
 
@@ -54,7 +59,12 @@ ones defined there (virtual pixel space, picture, bands, content area).
   ratio of every request; without it the bands stay until the window changes.
 - After a desk resize, the demo compacts the window on the first repaint tick
   with no mouse button down: a desk resize by the pointer lasts as long as a
-  button is held. `Buttons` reads the button state from the platform:
+  button is held. The same button state, with the window position, tells an
+  unmaximize from a title bar drag.
+- A desk window has the desk's minimum size: the smallest window whose picture
+  covers the min screen area. The Windows peer of the toolkit hands the desk
+  the minimum size in user space, and the desk reads it in device pixels, so
+  on Windows the frame reports it multiplied by the display scale. `Buttons` reads the button state from the platform:
   `GetAsyncKeyState` on Windows, `XQueryPointer` on X11,
   `CGEventSourceButtonState` on macOS.
 - The close key and the close button never close by themselves: they ask.
