@@ -1,6 +1,5 @@
 package demo;
 
-import java.awt.AWTEvent;
 import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
@@ -17,7 +16,6 @@ import java.awt.Polygon;
 import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.Toolkit;
-import java.awt.event.AWTEventListener;
 import java.awt.event.ActionEvent;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
@@ -48,7 +46,6 @@ final class Stage extends MouseAdapter{
   final JComponent surface= new JComponent(){ @Override protected void paintComponent(Graphics g){ paintSurface((Graphics2D)g); } };
   final Content content;
   final Timer timer= new Timer(tickMillis, _ -> tick());
-  final AWTEventListener touch= this::touched;
   final long t0= System.nanoTime();
   JFrame f;
   int canvasW;
@@ -77,7 +74,6 @@ final class Stage extends MouseAdapter{
     surface.addMouseMotionListener(this);
     surface.setOpaque(true);
     realize(c.opensAs(), "the program");
-    Toolkit.getDefaultToolkit().addAWTEventListener(touch, AWTEvent.MOUSE_EVENT_MASK|AWTEvent.MOUSE_MOTION_EVENT_MASK|AWTEvent.KEY_EVENT_MASK);
     timer.start();
     }
   private JFrame makeFrame(boolean undecorated){
@@ -202,11 +198,11 @@ final class Stage extends MouseAdapter{
     boolean deskChose= Math.abs(now.width-chosen.width) > 1 || Math.abs(now.height-chosen.height) > 1;
     if (!now.equals(lastSize) && deskChose){ deskResized|= deskWindow; request(now); }
     lastSize= now;
+    if (deskResized && !Buttons.down()){ compact(); }
     if (mode == Mode.fearless && translucent && c.pulse()){ f.setOpacity((float)(c.opacityFloor()+(1-c.opacityFloor())*(0.5+0.5*Math.cos((System.nanoTime()-t0)/0.5e9)))); }
     surface.repaint();
     }
-  private void touched(AWTEvent e){
-    if (!deskResized || e.getSource() != surface){ return; }
+  private void compact(){
     deskResized= false;
     log("the desk has finished resizing: compacting");
     place(compacted(inset(f.getBounds(), f.getInsets())));
@@ -219,7 +215,6 @@ final class Stage extends MouseAdapter{
   void close(){
     log("closed by the program");
     timer.stop();
-    Toolkit.getDefaultToolkit().removeAWTEventListener(touch);
     f.dispose();
     }
   void subtitle(String s){

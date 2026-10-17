@@ -24,7 +24,7 @@ final class Content{
     this.st= st;
     hints= List.of(
       text(st.c.closeKey())+" asks to close, "+text(st.c.fullScreenKey())+" toggles full screen.",
-      "Desk window: as on every window; after a desk resize it compacts at the next pointer or key event.",
+      "Desk window: as on every window; after a desk resize it compacts when no mouse button is down.",
       "Full screen: drag the corner for a Fearless window, double click it for a desk window.",
       "Fearless window: the corner moves (shrinks at the edge, full screen at the top left), the handle resizes.",
       "The swap button chooses a new virtual pixel space: the window keeps its center and its area.");

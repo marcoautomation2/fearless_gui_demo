@@ -45,6 +45,7 @@ public final class Build{
       "--module-path", mods.toString(),
       "--module", "demo/demo.Main",
       "--java-options", "-Dsun.java2d.d3d=false",
+      "--java-options", "--enable-native-access=demo",
       "--runtime-image", runtime.toString()));
     if (windows){ zip(app.resolve(appName), dist.resolve(appName+"_windows.zip")); }
     else{ tar(app, dist.resolve(appName+"_linux.tar.gz")); }

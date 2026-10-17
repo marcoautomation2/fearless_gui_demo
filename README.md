@@ -52,9 +52,11 @@ ones defined there (virtual pixel space, picture, bands, content area).
   content area; a maximized window does the same to its restore size.
 - With `Accept aspect ratio requests` the virtual pixel space takes the aspect
   ratio of every request; without it the bands stay until the window changes.
-- After a desk resize, the demo compacts the window at the first pointer or
-  key event the window receives: while the desk resizes a window it keeps the
-  pointer, so that event comes after the user has let go.
+- After a desk resize, the demo compacts the window on the first repaint tick
+  with no mouse button down: a desk resize by the pointer lasts as long as a
+  button is held. `Buttons` reads the button state from the platform:
+  `GetAsyncKeyState` on Windows, `XQueryPointer` on X11,
+  `CGEventSourceButtonState` on macOS.
 - The close key and the close button never close by themselves: they ask.
   With `Ask before closing` the question is drawn inside the picture.
 - With `Pulse the opacity` the window opacity swings between the floor and
@@ -66,7 +68,8 @@ ones defined there (virtual pixel space, picture, bands, content area).
   The application runs with `-Dsun.java2d.d3d=false`: on Windows the Direct3D
   pipeline makes full screen an exclusive mode of the display, and on a desk
   scaled above 100% the bounds set while leaving it reach the native window
-  unscaled. Run from a JDK, pass the same option.
+  unscaled. Run from a JDK, pass the same option, and
+  `--enable-native-access=demo` for `Buttons`.
 - The windows opened by `Show` share one program, and a program has one full
   screen window: a window entering full screen first turns the full screen
   window of another `Show` into a Fearless window.
