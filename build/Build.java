@@ -15,10 +15,11 @@ public final class Build{
   static final String appName= "fearless_gui_demo";
   static final Path root= Path.of("").toAbsolutePath();
   static final Path out= root.resolve("out");
-  static final boolean windows= System.getProperty("os.name").toLowerCase().contains("windows");
+  static final boolean windows= System.getProperty("os.name").startsWith("Windows");
 
   public static void main(String[] a) throws IOException, InterruptedException{
-    if (!Files.isDirectory(root.resolve("src"))){ throw new IllegalStateException("Run from the repository root, not from "+root); }
+    var src= root.resolve("src");
+    if (!Files.isDirectory(src)){ throw new IllegalStateException("Run from the repository root, not from "+root); }
     rmTree(out);
     var classes= out.resolve("classes");
     var mods= out.resolve("mods");
@@ -28,14 +29,9 @@ public final class Build{
     Files.createDirectories(mods);
     Files.createDirectories(dist);
     var args= new ArrayList<>(List.of("-encoding", "UTF-8", "-Xlint:all,-serial", "-Werror", "-d", classes.toString()));
-    args.addAll(files(root.resolve("src"), ".java"));
+    try (Stream<Path> s= Files.walk(src)){ s.map(Path::toString).filter(p -> p.endsWith(".java")).sorted().forEach(args::add); }
     run("javac", args);
-    for (var png : files(root.resolve("src"), ".png")){
-      var rel= root.resolve("src").relativize(Path.of(png));
-      Files.createDirectories(classes.resolve(rel).getParent());
-      Files.copy(Path.of(png), classes.resolve(rel));
-      }
-    run("jar", List.of("--create", "--file", mods.resolve("demo.jar").toString(), "-C", classes.toString(), "."));
+    run("jar", List.of("--create", "--file", mods.resolve("demo.jar").toString(), "-C", classes.toString(), ".", "-C", src.toString(), "demo/res"));
     run("jlink", List.of(
       "--module-path", Path.of(System.getProperty("java.home"), "jmods").toString(),
       "--add-modules", "java.desktop",
@@ -59,11 +55,6 @@ public final class Build{
     var t= ToolProvider.findFirst(tool).orElseThrow();
     int code= t.run(System.out, System.err, args.toArray(String[]::new));
     if (code != 0){ throw new IllegalStateException(tool+" failed with code "+code); }
-    }
-  static List<String> files(Path dir, String ext) throws IOException{
-    try (Stream<Path> s= Files.walk(dir)){
-      return s.filter(p -> p.toString().endsWith(ext)).map(Path::toString).sorted().toList();
-      }
     }
   static void rmTree(Path p) throws IOException{
     if (!Files.exists(p)){ return; }

@@ -82,35 +82,35 @@ final class Stage{
     surface.addMouseMotionListener(m);
     }
   private JFrame makeFrame(boolean undecorated){
-    var w= new JFrame(gc);
-    w.setUndecorated(undecorated);
-    w.setContentPane(surface);
-    w.setIconImage(Main.icon);
-    w.setTitle(title());
-    w.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
+    var frame= new JFrame(gc);
+    frame.setUndecorated(undecorated);
+    frame.setContentPane(surface);
+    frame.setIconImage(Main.icon);
+    frame.setTitle(title());
+    frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
     var l= new WindowAdapter(){
       @Override public void windowClosing(WindowEvent e){ closeRequest("the close button of the desk decorations"); }
-      @Override public void windowClosed(WindowEvent e){ desk(w, "closed"); }
-      @Override public void windowIconified(WindowEvent e){ desk(w, "iconified"); }
-      @Override public void windowDeiconified(WindowEvent e){ desk(w, "deiconified"); }
+      @Override public void windowClosed(WindowEvent e){ desk(frame, "closed"); }
+      @Override public void windowIconified(WindowEvent e){ desk(frame, "iconified"); }
+      @Override public void windowDeiconified(WindowEvent e){ desk(frame, "deiconified"); }
       @Override public void windowGainedFocus(WindowEvent e){ surface.requestFocusInWindow(); }
       };
-    w.addWindowListener(l);
-    w.addWindowFocusListener(l);
-    w.addComponentListener(new ComponentAdapter(){
-      @Override public void componentHidden(ComponentEvent e){ desk(w, "hidden"); }
-      @Override public void componentShown(ComponentEvent e){ desk(w, "shown"); }
+    frame.addWindowListener(l);
+    frame.addWindowFocusListener(l);
+    frame.addComponentListener(new ComponentAdapter(){
+      @Override public void componentHidden(ComponentEvent e){ desk(frame, "hidden"); }
+      @Override public void componentShown(ComponentEvent e){ desk(frame, "shown"); }
       });
-    w.addWindowStateListener(this::stateChanged);
-    bind(w, c.closeKey(), "close", () -> closeRequest("the close key"));
-    bind(w, c.fullScreenKey(), "fullScreen", () -> realize(mode == Mode.fullScreen ? Mode.fearless : Mode.fullScreen, "the full screen key"));
-    return w;
+    frame.addWindowStateListener(this::stateChanged);
+    bind(frame, c.closeKey(), "close", () -> closeRequest("the close key"));
+    bind(frame, c.fullScreenKey(), "fullScreen", () -> realize(mode == Mode.fullScreen ? Mode.fearless : Mode.fullScreen, "the full screen key"));
+    return frame;
     }
-  private static void bind(JFrame w, KeyStroke k, String name, Runnable r){
-    w.getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(k, name);
-    w.getRootPane().getActionMap().put(name, new AbstractAction(){ @Override public void actionPerformed(ActionEvent e){ r.run(); } });
+  private static void bind(JFrame frame, KeyStroke k, String name, Runnable r){
+    frame.getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(k, name);
+    frame.getRootPane().getActionMap().put(name, new AbstractAction(){ @Override public void actionPerformed(ActionEvent e){ r.run(); } });
     }
-  private void desk(JFrame w, String what){ if (w == f){ log("the desk reports the window "+what); } }
+  private void desk(JFrame frame, String what){ if (frame == f){ log("the desk reports the window "+what); } }
   private void log(String s){ Main.log("#"+id+" "+s); }
 
   void open(){
@@ -126,14 +126,12 @@ final class Stage{
     var old= f;
     boolean maximize= m == Mode.decorated && mode == Mode.fullScreen;
     log((mode == null ? "" : state()+" -> ")+m+(maximize ? " maximized" : "")+" by "+why);
-    boolean reuse= old != null && mode != Mode.decorated && m != Mode.decorated;
-    if (!reuse){ f= makeFrame(m != Mode.decorated); }
-    windowed(f);
+    if (old == null || mode == Mode.decorated || m == Mode.decorated){ f= makeFrame(m != Mode.decorated); }
     mode= m;
     watching= 0;
     switch (m){
       case fullScreen -> device.setFullScreenWindow(f);
-      case fearless -> { f.setBounds(r); f.setVisible(true); }
+      case fearless -> { windowed(f); f.setBounds(r); f.setVisible(true); }
       case decorated -> {
         f.setBounds(wrapped(r));
         if (maximize){ f.setExtendedState(Frame.MAXIMIZED_BOTH); }
@@ -142,12 +140,12 @@ final class Stage{
       }
     f.toFront();
     surface.requestFocusInWindow();
-    if (!reuse && old != null){ dispose(old); }
+    if (old != null && old != f){ dispose(old); }
     }
-  private void windowed(JFrame w){ if (device.getFullScreenWindow() == w){ device.setFullScreenWindow(null); } }
-  private void dispose(JFrame w){
-    windowed(w);
-    w.dispose();
+  private void windowed(JFrame frame){ if (device.getFullScreenWindow() == frame){ device.setFullScreenWindow(null); } }
+  private void dispose(JFrame frame){
+    windowed(frame);
+    frame.dispose();
     }
   private Rectangle wrapped(Rectangle r){
     f.pack();
@@ -238,7 +236,7 @@ final class Stage{
   private boolean inTip(Point p){ return mode == Mode.fearless && p.x < tip() && p.y < tip(); }
 
   private void move(Point p){
-    mouse= canvasPoint(p);
+    if (!inCorner(p)){ mouse= canvasPoint(p); }
     int cursor= !inCorner(p) ? Cursor.DEFAULT_CURSOR : inTip(p) ? Cursor.NW_RESIZE_CURSOR : Cursor.MOVE_CURSOR;
     surface.setCursor(Cursor.getPredefinedCursor(cursor));
     }
@@ -283,15 +281,15 @@ final class Stage{
     }
 
   private void paintSurface(Graphics2D g){
+    g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+    g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+    g.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
+    g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
     g.setColor(c.bands());
     g.fillRect(0, 0, surface.getWidth(), surface.getHeight());
     double s= scale();
     var o= offset(s);
     var cg= (Graphics2D)g.create();
-    cg.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-    cg.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-    cg.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
-    cg.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
     cg.translate(o.x, o.y);
     cg.scale(s, s);
     cg.clipRect(0, 0, canvasW, canvasH);
@@ -305,7 +303,6 @@ final class Stage{
     g.setColor(new Color(28, 28, 32));
     g.fill(tri);
     var ig= (Graphics2D)g.create();
-    ig.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
     ig.clip(tri);
     int side= l/2;
     int at= (int)Math.round(l*(2-Math.sqrt(2))/2)-side/2;
