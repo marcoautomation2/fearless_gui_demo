@@ -55,7 +55,8 @@ final class Stage extends MouseAdapter{
   Dimension lastSize= new Dimension();
   Dimension chosen= new Dimension();
   boolean deskResized;
-  Point unmaximizedAt;
+  boolean unmaximized;
+  Rectangle restore;
   boolean placing;
   int requests;
   String lastRequest= "none";
@@ -82,7 +83,7 @@ final class Stage extends MouseAdapter{
       @Override public Dimension getMinimumSize(){
         var d= super.getMinimumSize();
         // The Windows peer gives the desk the minimum size in user space, and the desk reads it in device pixels
-        double k= placing || !Buttons.os.startsWith("Windows") ? 1 : gc.getDefaultTransform().getScaleX();
+        double k= placing || !Desk.windows ? 1 : gc.getDefaultTransform().getScaleX();
         return new Dimension((int)Math.ceil(d.width*k), (int)Math.ceil(d.height*k));
         }
       };
@@ -126,7 +127,7 @@ final class Stage extends MouseAdapter{
     if (old == null || old.isUndecorated() != undecorated || maximize){ f= makeFrame(undecorated); }
     mode= m;
     deskResized= false;
-    unmaximizedAt= null;
+    unmaximized= false;
     switch (m){
       case fullScreen -> {
         Main.stages.stream().filter(s -> s.f == device.getFullScreenWindow()).forEach(s -> s.realize(Mode.fearless, "#"+id+" taking full screen"));
@@ -139,7 +140,7 @@ final class Stage extends MouseAdapter{
       case decorated -> {
         f.pack();
         place(compacted(inset(r, f.getInsets())));
-        if (maximize){ f.setExtendedState(Frame.MAXIMIZED_BOTH); }
+        if (maximize){ restore= f.getBounds(); f.setExtendedState(Frame.MAXIMIZED_BOTH); }
         }
       }
     minimum();
@@ -150,11 +151,14 @@ final class Stage extends MouseAdapter{
     }
   private static Rectangle inset(Rectangle r, Insets in){ return new Rectangle(r.x+in.left, r.y+in.top, r.width-in.left-in.right, r.height-in.top-in.bottom); }
   private static int within(int v, int low, int high){ return Math.max(low, Math.min(v, high)); }
+  private Rectangle outset(Rectangle content){
+    var in= f.getInsets();
+    return new Rectangle(content.x-in.left, content.y-in.top, content.width+in.left+in.right, content.height+in.top+in.bottom);
+    }
   private void place(Rectangle content){
     chosen= content.getSize();
-    var in= f.getInsets();
     placing= true;
-    f.setBounds(content.x-in.left, content.y-in.top, content.width+in.left+in.right, content.height+in.top+in.bottom);
+    f.setBounds(outset(content));
     placing= false;
     }
   private void minimum(){
@@ -209,11 +213,11 @@ final class Stage extends MouseAdapter{
     var now= surface.getSize();
     boolean deskWindow= mode == Mode.decorated && !maximized();
     deskResized&= deskWindow;
-    boolean deskChose= Math.abs(now.width-chosen.width) > 1 || Math.abs(now.height-chosen.height) > 1;
+    boolean deskChose= !near(now.width, chosen.width) || !near(now.height, chosen.height);
     if (!now.equals(lastSize) && deskChose){ deskResized|= deskWindow; request(now); }
     lastSize= now;
-    if (unmaximizedAt != null && !Buttons.down()){ unmaximized(); return; }
-    if (deskResized && !Buttons.down()){ compact(); }
+    if (unmaximized && !Desk.down()){ unmaximized(); return; }
+    if (deskResized && !Desk.down()){ compact(); }
     if (mode == Mode.fearless && translucent && c.pulse()){ f.setOpacity((float)(c.opacityFloor()+(1-c.opacityFloor())*(0.5+0.5*Math.cos((System.nanoTime()-t0)/0.5e9)))); }
     surface.repaint();
     }
@@ -222,20 +226,24 @@ final class Stage extends MouseAdapter{
     desk(e, "in state "+e.getNewState());
     boolean was= (e.getOldState() & Frame.MAXIMIZED_BOTH) != 0;
     boolean is= (e.getNewState() & Frame.MAXIMIZED_BOTH) != 0;
+    if (!was && is && Desk.windows){ restore= outset(compacted(inset(fit(workArea, workArea.width), f.getInsets()))); Desk.restoreSize(f, restore, true); return; }
     if (!was && is){ realize(Mode.decorated, "the desk's maximize"); return; }
-    if (was && !is && (e.getNewState() & Frame.ICONIFIED) == 0){ unmaximizedAt= f.getLocation(); }
+    unmaximized= was && !is && (e.getNewState() & Frame.ICONIFIED) == 0;
     }
+  private static boolean near(int a, int b){ return Math.abs(a-b) <= 1; }
   private void unmaximized(){
-    var at= unmaximizedAt;
-    unmaximizedAt= null;
-    if (f.getLocation().equals(at)){ realize(Mode.fullScreen, "the desk's unmaximize"); return; }
-    log("a title bar drag: the window stays a desk window");
+    unmaximized= false;
+    var b= f.getBounds();
+    boolean restored= near(b.x, restore.x) && near(b.y, restore.y) && near(b.width, restore.width) && near(b.height, restore.height);
+    if (restored){ realize(Mode.fullScreen, "the desk's unmaximize"); return; }
+    log("a title bar drag or a desk arrangement: the window stays a desk window");
     compact();
     }
   private void compact(){
     deskResized= false;
     log("the desk has finished resizing: compacting");
     place(compacted(inset(f.getBounds(), f.getInsets())));
+    if (Desk.windows){ Desk.restoreSize(f, f.getBounds(), false); }
     }
 
   private void closeRequest(String why){

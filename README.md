@@ -54,19 +54,26 @@ ones defined there (virtual pixel space, picture, bands, content area).
   (click the first button).
 - The second button swaps the width and the height of the virtual pixel space:
   a Fearless window and a desk window keep the center and the area of their
-  content area; a maximized window does the same to its restore size.
+  content area; a maximized window and full screen show new bands.
 - With `Accept aspect ratio requests` the virtual pixel space takes the aspect
   ratio of every request; without it the bands stay until the window changes.
 - After a desk resize, the demo compacts the window on the first repaint tick
   with no mouse button down: a desk resize by the pointer lasts as long as a
-  button is held. The same button state, with the window position, tells an
-  unmaximize from a title bar drag.
+  button is held. After an unmaximize, once no button is down, a window that is
+  exactly the restore size the demo gave it goes to full screen; a window the
+  desk moved (a title bar drag) or arranged (a snap) stays a desk window.
+  `Desk` reads the button state from the platform: `GetAsyncKeyState` on
+  Windows, `XQueryPointer` on X11, `CGEventSourceButtonState` on macOS.
+- The desk keeps no size of an earlier window. On Windows, each compaction
+  also sets the window's restore size to its current size with
+  `SetWindowPlacement`, which ends a snap: Java's `setBounds` moves a snapped
+  window but leaves the size from before the snap as its restore size. When
+  the desk maximizes a window, the demo sets its restore size the same way.
+  On other desks a maximize replaces the window with a new maximized one.
 - A desk window has the desk's minimum size: the smallest window whose picture
   covers the min screen area. The Windows peer of the toolkit hands the desk
   the minimum size in user space, and the desk reads it in device pixels, so
-  on Windows the frame reports it multiplied by the display scale. `Buttons` reads the button state from the platform:
-  `GetAsyncKeyState` on Windows, `XQueryPointer` on X11,
-  `CGEventSourceButtonState` on macOS.
+  on Windows the frame reports it multiplied by the display scale.
 - The close key and the close button never close by themselves: they ask.
   With `Ask before closing` the question is drawn inside the picture.
 - With `Pulse the opacity` the window opacity swings between the floor and
@@ -78,8 +85,9 @@ ones defined there (virtual pixel space, picture, bands, content area).
   The application runs with `-Dsun.java2d.d3d=false`: on Windows the Direct3D
   pipeline makes full screen an exclusive mode of the display, and on a desk
   scaled above 100% the bounds set while leaving it reach the native window
-  unscaled. Run from a JDK, pass the same option, and
-  `--enable-native-access=demo` for `Buttons`.
+  unscaled. Run from a JDK, pass the same option, `--enable-native-access=demo`,
+  and on Windows `--add-opens java.desktop/java.awt=demo` and
+  `--add-opens java.desktop/sun.awt.windows=demo` (the window handle).
 - The windows opened by `Show` share one program, and a program has one full
   screen window: a window entering full screen first turns the full screen
   window of another `Show` into a Fearless window.

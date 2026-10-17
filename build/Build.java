@@ -37,7 +37,8 @@ public final class Build{
       "--output", runtime.toString(),
       "--no-header-files", "--no-man-pages", "--strip-debug", "--compress", "zip-0"));
     var icon= root.resolve("packaging").resolve(windows ? "windows/icon.ico" : "linux/icon.png");
-    run("jpackage", List.of(
+    var options= windows ? List.of("--add-opens", "java.desktop/java.awt=demo", "--add-opens", "java.desktop/sun.awt.windows=demo") : List.<String>of();
+    var jpackage= new ArrayList<>(List.of(
       "--type", "app-image",
       "--dest", app.toString(),
       "--name", appName,
@@ -47,6 +48,8 @@ public final class Build{
       "--java-options", "-Dsun.java2d.d3d=false",
       "--java-options", "--enable-native-access=demo",
       "--runtime-image", runtime.toString()));
+    options.forEach(o -> { jpackage.add("--java-options"); jpackage.add(o); });
+    run("jpackage", jpackage);
     if (windows){ zip(app.resolve(appName), dist.resolve(appName+"_windows.zip")); }
     else{ tar(app, dist.resolve(appName+"_linux.tar.gz")); }
     System.out.println("Built "+dist);
