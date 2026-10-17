@@ -87,6 +87,9 @@ memory: what is on screen is the whole state.
 - Full screen is asked of the desk as such (`GraphicsDevice.setFullScreenWindow`,
   the `_NET_WM_STATE_FULLSCREEN` hint on X11): a borderless window merely
   sized like the screen is kept inside the work area by GNOME.
+- The windows opened by `Show` share one program, and a program has one full
+  screen window: a window entering full screen first turns the full screen
+  window of another `Show` into a Fearless window.
 - The desk reports the same unmaximize for the button and for a title bar
   drag. After the event the demo watches the window position on its repaint
   ticks: still for 100 ms gives full screen; no such still period within

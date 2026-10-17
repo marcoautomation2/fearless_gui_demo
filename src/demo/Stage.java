@@ -90,16 +90,16 @@ final class Stage extends MouseAdapter{
     frame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
     var l= new WindowAdapter(){
       @Override public void windowClosing(WindowEvent e){ closeRequest("the desk"); }
-      @Override public void windowClosed(WindowEvent e){ desk(frame, "closed"); }
-      @Override public void windowIconified(WindowEvent e){ desk(frame, "iconified"); }
-      @Override public void windowDeiconified(WindowEvent e){ desk(frame, "deiconified"); }
+      @Override public void windowClosed(WindowEvent e){ desk(e, "closed"); }
+      @Override public void windowIconified(WindowEvent e){ desk(e, "iconified"); }
+      @Override public void windowDeiconified(WindowEvent e){ desk(e, "deiconified"); }
       @Override public void windowGainedFocus(WindowEvent e){ surface.requestFocusInWindow(); }
       };
     frame.addWindowListener(l);
     frame.addWindowFocusListener(l);
     frame.addComponentListener(new ComponentAdapter(){
-      @Override public void componentHidden(ComponentEvent e){ desk(frame, "hidden"); }
-      @Override public void componentShown(ComponentEvent e){ desk(frame, "shown"); }
+      @Override public void componentHidden(ComponentEvent e){ desk(e, "hidden"); }
+      @Override public void componentShown(ComponentEvent e){ desk(e, "shown"); }
       });
     frame.addWindowStateListener(this::stateChanged);
     bind(frame, c.closeKey(), () -> closeRequest("the close key"));
@@ -110,7 +110,7 @@ final class Stage extends MouseAdapter{
     frame.getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(k, k);
     frame.getRootPane().getActionMap().put(k, new AbstractAction(){ @Override public void actionPerformed(ActionEvent e){ r.run(); } });
     }
-  private void desk(JFrame frame, String what){ if (frame == f){ log("the desk reports the window "+what); } }
+  private void desk(ComponentEvent e, String what){ if (e.getComponent() == f){ log("the desk reports the window "+what); } }
   private void log(String s){ Main.log("#"+id+" "+s); }
 
   private void realize(Mode m, String why){
@@ -123,20 +123,22 @@ final class Stage extends MouseAdapter{
     mode= m;
     watching= 0;
     switch (m){
-      case fullScreen -> device.setFullScreenWindow(f);
+      case fullScreen -> {
+        Main.stages.stream().filter(s -> s.f == device.getFullScreenWindow()).forEach(s -> s.realize(Mode.fearless, "#"+id+" taking full screen"));
+        device.setFullScreenWindow(f);
+        }
       case fearless -> {
         if (device.getFullScreenWindow() == f){ device.setFullScreenWindow(null); }
         f.setBounds(r);
-        f.setVisible(true);
         }
       case decorated -> {
         f.pack();
         var in= f.getInsets();
         f.setBounds(inset(fit(inset(r, in), r.width), new Insets(-in.top, -in.left, -in.bottom, -in.right)));
         if (maximize){ f.setExtendedState(Frame.MAXIMIZED_BOTH); }
-        f.setVisible(true);
         }
       }
+    f.setVisible(true);
     f.toFront();
     surface.requestFocusInWindow();
     if (old != null && old != f){ old.dispose(); }
@@ -174,7 +176,7 @@ final class Stage extends MouseAdapter{
     surface.repaint();
     }
   private void stateChanged(WindowEvent e){
-    if (e.getWindow() != f || mode != Mode.decorated){ return; }
+    if (e.getComponent() != f || mode != Mode.decorated){ return; }
     boolean unmaximized= (e.getOldState() & Frame.MAXIMIZED_BOTH) != 0 && (e.getNewState() & (Frame.MAXIMIZED_BOTH|Frame.ICONIFIED)) == 0;
     watching= unmaximized ? dragTicks : 0;
     if (!unmaximized){ return; }
@@ -187,7 +189,7 @@ final class Stage extends MouseAdapter{
     still= at.equals(lastLocation) ? still+1 : 0;
     lastLocation= at;
     watching-= 1;
-    if (still > stillTicks){ realize(Mode.fullScreen, "unmaximize"); return; }
+    if (still == stillTicks){ realize(Mode.fullScreen, "unmaximize"); return; }
     if (watching == 0){ log("the desk is moving the window: a title bar drag, the window stays decorated"); }
     }
 
@@ -295,10 +297,10 @@ final class Stage extends MouseAdapter{
 
   List<String> status(){
     var d= surface.getSize();
-    String opacity= translucent ? "" : " (translucency not supported on this desk)";
+    String translucency= translucent ? "" : " (translucency not supported on this desk)";
     return List.of(
       String.format(Locale.ROOT, "canvas %dx%d units, scale %.3f", canvasW, canvasH, scale()),
-      "window content "+d.width+"x"+d.height+" px, "+state()+opacity,
+      "window content "+d.width+"x"+d.height+" px, "+state()+translucency,
       "aspect ratio requests: "+requests+", last "+lastRequest,
       "mouse "+mouse.x+", "+mouse.y+" (canvas units)");
     }
