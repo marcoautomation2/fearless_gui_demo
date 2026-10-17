@@ -75,15 +75,19 @@ final class Stage{
     var m= new MouseAdapter(){
       @Override public void mousePressed(MouseEvent e){ press(e); }
       @Override public void mouseReleased(MouseEvent e){ release(e.getLocationOnScreen()); }
-      @Override public void mouseDragged(MouseEvent e){ drag(e.getLocationOnScreen()); }
+      @Override public void mouseDragged(MouseEvent e){ drag(e); }
       @Override public void mouseMoved(MouseEvent e){ move(e.getPoint()); }
       };
     surface.addMouseListener(m);
     surface.addMouseMotionListener(m);
+    surface.setOpaque(true);
+    realize(c.opensAs(), "open");
+    timer.start();
     }
   private JFrame makeFrame(boolean undecorated){
     var frame= new JFrame(gc);
     frame.setUndecorated(undecorated);
+    frame.setBackground(Color.black);
     frame.setContentPane(surface);
     frame.setIconImage(Main.icon);
     frame.setTitle(title());
@@ -113,13 +117,9 @@ final class Stage{
   private void desk(JFrame frame, String what){ if (frame == f){ log("the desk reports the window "+what); } }
   private void log(String s){ Main.log("#"+id+" "+s); }
 
-  void open(){
-    realize(c.opensAs(), "open");
-    timer.start();
-    }
   private Rectangle window(){
     if (f != null && mode != Mode.fullScreen){ return f.getBounds(); }
-    return fit(workArea, f == null ? width(c.screenArea()) : workArea.width);
+    return fit(workArea, f == null ? areaWidth(c.screenArea()) : workArea.width);
     }
   private void realize(Mode m, String why){
     var r= window();
@@ -163,8 +163,8 @@ final class Stage{
     var d= size(Math.min(w, fitWidth(r.width, r.height)));
     return new Rectangle(r.x+(r.width-d.width)/2, r.y+(r.height-d.height)/2, d.width, d.height);
     }
-  private double width(double area){ return Math.min(Math.sqrt(area*screen.width*(double)screen.height*canvasW/canvasH), fitWidth(workArea.width, workArea.height)); }
-  private Dimension clamped(double w, int roomW, int roomH){ return size(Math.max(Math.min(w, fitWidth(roomW, roomH)), width(c.minArea()))); }
+  private double areaWidth(double area){ return Math.min(Math.sqrt(area*screen.width*(double)screen.height*canvasW/canvasH), fitWidth(workArea.width, workArea.height)); }
+  private Dimension clamped(double w, int roomW, int roomH){ return size(Math.max(Math.min(w, fitWidth(roomW, roomH)), areaWidth(c.minArea()))); }
   private String state(){ return mode+((f.getExtendedState() & Frame.MAXIMIZED_BOTH) != 0 ? " maximized" : ""); }
 
   private void request(Dimension d){
@@ -190,9 +190,8 @@ final class Stage{
     return (float)(c.opacityFloor()+(1-c.opacityFloor())*(0.5+0.5*Math.sin(t*2)));
     }
   private void stateChanged(WindowEvent e){
-    boolean was= (e.getOldState() & Frame.MAXIMIZED_BOTH) != 0;
-    boolean is= (e.getNewState() & (Frame.MAXIMIZED_BOTH|Frame.ICONIFIED)) != 0;
-    if (mode != Mode.decorated || !was || is){ return; }
+    boolean unmaximized= (e.getOldState() & Frame.MAXIMIZED_BOTH) != 0 && (e.getNewState() & (Frame.MAXIMIZED_BOTH|Frame.ICONIFIED)) == 0;
+    if (e.getWindow() != f || mode != Mode.decorated || !unmaximized){ return; }
     log("unmaximized: watching for a title bar drag");
     watching= dragTicks;
     still= 0;
@@ -248,35 +247,33 @@ final class Stage{
     resizing= inTip(e.getPoint());
     dragged= false;
     }
-  private void drag(Point p){
-    if (pressAt == null){ return; }
+  private void drag(MouseEvent e){
+    if (pressAt == null){ move(e.getPoint()); return; }
+    var p= e.getLocationOnScreen();
     if (!dragged && p.distance(pressAt) <= 3){ return; }
     dragged= true;
     if (mode == Mode.fullScreen){ realize(Mode.fearless, "a corner drag"); pressBounds.setSize(f.getSize()); }
-    var t= new Rectangle(pressBounds);
-    t.translate(p.x-pressAt.x, p.y-pressAt.y);
-    f.setBounds(resizing ? resized(t) : moved(t));
+    var at= new Point(pressBounds.x+p.x-pressAt.x, pressBounds.y+p.y-pressAt.y);
+    f.setBounds(resizing ? resized(at) : moved(at));
     }
   private void release(Point p){
     if (pressAt == null){ return; }
     pressAt= null;
     if (!dragged || mode != Mode.fearless){ return; }
-    int snap= screen.height/16;
-    log("corner drag ended with the pointer at "+p.x+","+p.y+", the work area at "+workArea.x+","+workArea.y+", snap within "+snap);
-    if (p.distance(workArea.getLocation()) <= snap){ realize(Mode.fullScreen, "a corner drop at the top left"); }
+    if (p.distance(workArea.getLocation()) <= screen.height/16){ realize(Mode.fullScreen, "a corner drop at the top left"); }
     }
-  private Rectangle moved(Rectangle t){
+  private Rectangle moved(Point at){
     int right= workArea.x+workArea.width;
     int bottom= workArea.y+workArea.height;
-    int x= Math.max(workArea.x, t.x);
-    int y= Math.max(workArea.y, t.y);
-    var d= clamped(t.width, right-x, bottom-y);
+    int x= Math.max(workArea.x, at.x);
+    int y= Math.max(workArea.y, at.y);
+    var d= clamped(pressBounds.width, right-x, bottom-y);
     return new Rectangle(Math.min(x, right-d.width), Math.min(y, bottom-d.height), d.width, d.height);
     }
-  private Rectangle resized(Rectangle t){
+  private Rectangle resized(Point at){
     int right= pressBounds.x+pressBounds.width;
     int bottom= pressBounds.y+pressBounds.height;
-    var d= clamped(Math.max(right-t.x, (bottom-t.y)*(double)canvasW/canvasH), right-workArea.x, bottom-workArea.y);
+    var d= clamped(Math.max(right-at.x, (bottom-at.y)*(double)canvasW/canvasH), right-workArea.x, bottom-workArea.y);
     return new Rectangle(right-d.width, bottom-d.height, d.width, d.height);
     }
 

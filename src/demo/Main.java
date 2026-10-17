@@ -52,7 +52,7 @@ public final class Main{
     System.err.print(line);
     SwingUtilities.invokeLater(() -> logArea.append(line));
     }
-  private static JTextArea area(int rows){
+  private static JTextArea textArea(int rows){
     var t= new JTextArea(rows, 60);
     t.setEditable(false);
     t.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 11));
@@ -70,32 +70,32 @@ public final class Main{
     }
 
   private static void launcher(){
-    logArea= area(10);
-    var live= area(4);
+    logArea= textArea(10);
+    var live= textArea(4);
     var f= new JFrame("Fearless Gui demo: initial configuration");
     f.setIconImage(icon);
     f.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
     var p= new JPanel(new GridLayout(0, 2, 8, 6));
     p.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
     var name= row(p, "Name (fixed, shown before the subtitle)", new JTextField("Fearless App"));
-    var area= row(p, "Screen area at open, in (0, 1]", new JTextField("0.3"));
+    var screenArea= row(p, "Screen area at open, in (0, 1]", new JTextField("0.3"));
     var minArea= row(p, "Min screen area, in (0, screen area]", new JTextField("0.02"));
-    var cw= row(p, "Canvas width, in units", new JTextField("520"));
-    var ch= row(p, "Canvas height, in units", new JTextField("340"));
-    var opens= row(p, "Opens as", new JComboBox<>(Stage.Mode.values()));
-    var floor= row(p, "Opacity floor, in [0, 1]", new JTextField("0.4"));
+    var canvasW= row(p, "Canvas width, in units", new JTextField("520"));
+    var canvasH= row(p, "Canvas height, in units", new JTextField("340"));
+    var opensAs= row(p, "Opens as", new JComboBox<>(Stage.Mode.values()));
+    var opacityFloor= row(p, "Opacity floor, in [0, 1]", new JTextField("0.4"));
     var pulse= row(p, "Pulse the opacity (Fearless window only)", new JCheckBox());
     var closeKey= row(p, "Close key", new JTextField("ESCAPE"));
-    var fsKey= row(p, "Full screen key", new JTextField("F11"));
-    var accept= row(p, "Accept aspect ratio requests", new JCheckBox("", true));
-    var ask= row(p, "Ask before closing", new JCheckBox());
+    var fullScreenKey= row(p, "Full screen key", new JTextField("F11"));
+    var acceptAspect= row(p, "Accept aspect ratio requests", new JCheckBox("", true));
+    var askBeforeClose= row(p, "Ask before closing", new JCheckBox());
     var bands= row(p, "Bands color", new JComboBox<>(Config.Bands.values()));
     var status= new JLabel(" ");
     status.setForeground(Color.red);
     var show= new JButton("Show");
-    show.addActionListener(_ -> open(status, () -> Config.parse(name.getText(), area.getText(), minArea.getText(), cw.getText(), ch.getText(),
-      opens.getItemAt(opens.getSelectedIndex()), floor.getText(), pulse.isSelected(), closeKey.getText(), fsKey.getText(),
-      accept.isSelected(), ask.isSelected(), bands.getItemAt(bands.getSelectedIndex()))));
+    show.addActionListener(_ -> open(status, () -> Config.parse(name.getText(), screenArea.getText(), minArea.getText(), canvasW.getText(), canvasH.getText(),
+      opensAs.getItemAt(opensAs.getSelectedIndex()), opacityFloor.getText(), pulse.isSelected(), closeKey.getText(), fullScreenKey.getText(),
+      acceptAspect.isSelected(), askBeforeClose.isSelected(), bands.getItemAt(bands.getSelectedIndex()))));
     p.add(status);
     p.add(show);
     var all= new JPanel(new BorderLayout(0, 8));
@@ -116,9 +116,7 @@ public final class Main{
     try{ c= read.get(); }
     catch (IllegalArgumentException e){ status.setText(e.getMessage()); return; }
     status.setText(" ");
-    var st= new Stage(stages.size()+1, c);
-    stages.add(st);
-    st.open();
+    stages.add(new Stage(stages.size()+1, c));
     }
   private static JPanel titled(String title, Component c){
     var p= new JPanel(new BorderLayout());
