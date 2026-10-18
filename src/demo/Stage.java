@@ -319,7 +319,7 @@ final class Stage extends MouseAdapter{
     var now= Desk.bounds(f);
     if (Desk.maximized(f)){ maxed= now; deskMaximized= true; return; }
     if (!deskMaximized){ seen= now; return; }
-    if (now.equals(maxed)){ return; }
+    if (now.equals(maxed) || Desk.down()){ return; }
     deskMaximized= false;
     if (now.x == seen.x && now.y == seen.y){ realize(Mode.fullScreen, "the desk's unmaximize"); return; }
     log("a title bar drag: the window stays a desk window");
