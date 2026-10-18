@@ -57,6 +57,10 @@ final class Desk{
     call(X11.query, X11.display, X11.root, o, o.asSlice(8), o.asSlice(16), o.asSlice(20), o.asSlice(24), o.asSlice(28), o.asSlice(32));
     return (o.get(ValueLayout.JAVA_INT, 32) & 0x700) != 0;
     }
+  static boolean maximized(Frame f){
+    var s= LongStream.of(X11.atoms(X11.window(f), "_NET_WM_STATE")).boxed().toList();
+    return s.contains(X11.atom("_NET_WM_STATE_MAXIMIZED_VERT")) && s.contains(X11.atom("_NET_WM_STATE_MAXIMIZED_HORZ"));
+    }
   static boolean fullScreen(Frame f){
     long fs= X11.atom("_NET_WM_STATE_FULLSCREEN");
     return LongStream.of(X11.atoms(X11.window(f), "_NET_WM_STATE")).anyMatch(a -> a == fs);

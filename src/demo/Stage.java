@@ -11,7 +11,6 @@ import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
 import java.awt.Insets;
 import java.awt.KeyboardFocusManager;
-import java.awt.MouseInfo;
 import java.awt.Point;
 import java.awt.Polygon;
 import java.awt.Rectangle;
@@ -69,8 +68,9 @@ final class Stage extends MouseAdapter{
   boolean activating;
   boolean handed;
   Rectangle pending;
-  Point pressPoint;
-  double moved;
+  Rectangle maxed= new Rectangle();
+  Rectangle seen= new Rectangle();
+  boolean deskMaximized;
 
   Stage(int id, Config c){
     this.id= id;
@@ -151,6 +151,7 @@ final class Stage extends MouseAdapter{
     mode= m;
     deskResized= false;
     unmaximized= false;
+    deskMaximized= false;
     switch (m){
       case fullScreen -> {
         Main.stages.stream().filter(s -> s.f == device.getFullScreenWindow()).forEach(s -> s.realize(Mode.fearless, "#"+id+" taking full screen"));
@@ -250,7 +251,7 @@ final class Stage extends MouseAdapter{
   private void tick(){
     if (Desk.managed){ managedState(); }
     if (activating && Desk.managing(f)){ activating= false; Desk.activate(f); }
-    if (!Desk.windows && !Desk.cosmic){ trackPress(); }
+    if (x11Unmaximize() && mode == Mode.decorated){ unmaximizeX11(); }
     var now= surface.getSize();
     boolean deskWindow= mode == Mode.decorated && !maximized() && !Desk.managed;
     deskResized&= deskWindow;
@@ -299,23 +300,24 @@ final class Stage extends MouseAdapter{
     boolean was= (e.getOldState() & Frame.MAXIMIZED_BOTH) == Frame.MAXIMIZED_BOTH;
     boolean is= (e.getNewState() & Frame.MAXIMIZED_BOTH) == Frame.MAXIMIZED_BOTH;
     if (!was && is && Desk.windows){ Desk.restoreSize(f, restore, true); return; }
-    unmaximized= was && (e.getNewState() & (Frame.MAXIMIZED_BOTH|Frame.ICONIFIED)) == 0;
+    unmaximized= !x11Unmaximize() && was && (e.getNewState() & (Frame.MAXIMIZED_BOTH|Frame.ICONIFIED)) == 0;
     }
   private static boolean near(int a, int b){ return Math.abs(a-b) <= 1; }
-  private void trackPress(){
-    if (!Desk.down()){ if (!unmaximized){ pressPoint= null; moved= 0; } return; }
-    var p= MouseInfo.getPointerInfo().getLocation();
-    if (pressPoint == null){ pressPoint= p; }
-    moved= Math.max(moved, p.distance(pressPoint));
+  private boolean x11Unmaximize(){ return !Desk.windows && !Desk.mac && !Desk.cosmic && !Desk.managed; }
+  private void unmaximizeX11(){
+    var now= Desk.bounds(f);
+    if (Desk.maximized(f)){ maxed= now; deskMaximized= true; return; }
+    if (!deskMaximized){ seen= now; return; }
+    if (now.equals(maxed)){ return; }
+    deskMaximized= false;
+    if (now.x == seen.x && now.y == seen.y){ realize(Mode.fullScreen, "the desk's unmaximize"); return; }
+    log("a title bar drag: the window stays a desk window");
+    compact();
     }
   private void unmaximized(){
     unmaximized= false;
     var b= f.getBounds();
-    boolean restored= Desk.windows || Desk.cosmic
-      ? near(b.x, restore.x) && near(b.y, restore.y) && near(b.width, restore.width) && near(b.height, restore.height)
-      : moved <= DragSource.getDragThreshold();
-    pressPoint= null;
-    moved= 0;
+    boolean restored= near(b.x, restore.x) && near(b.y, restore.y) && near(b.width, restore.width) && near(b.height, restore.height);
     if (restored){ realize(Mode.fullScreen, "the desk's unmaximize"); return; }
     log("a title bar drag or a desk arrangement: the window stays a desk window");
     compact();

@@ -47,9 +47,10 @@ floating desk.
     Corner double click      1 to 4, 2 to 4, on the release of the second click.
     Full screen key          1 to 2; 2, 3, 4 to 1.
     Desk maximize            4 to 3.
-    Desk unmaximize          3 to 1, once no mouse button is down; a title bar
-                             drag (the pointer moved with a button down) stays
-                             in 4 and is compacted.
+    Desk unmaximize          3 to 1 when the desk puts the window back at its
+                             restore position; a title bar drag (the window
+                             lands under the pointer) stays in 4 and is
+                             compacted.
     In every state the picture covers at least the min screen area.
 
 ## KDE Plasma on Wayland
@@ -109,11 +110,14 @@ ends, nor its work area:
   ratio of every request; without it the bands stay until the window changes.
 - After a desk resize, the demo compacts the window on the first repaint tick
   with no mouse button down: a desk resize by the pointer lasts as long as a
-  button is held. After an unmaximize, once no button is down, the window goes
-  to full screen unless the pointer moved past the drag threshold with a
-  button down (a title bar drag): GNOME gives back a large restore size
-  resized. On Windows and COSMIC the window goes to full screen when it is
-  exactly the restore size the demo gave it.
+  button is held. After an unmaximize the demo decides on the first position
+  the desk reports: at the restore position the window goes to full screen,
+  elsewhere the desk moved it (a title bar drag). Only the position counts:
+  GNOME gives back a large restore size resized. On Windows and COSMIC the
+  window also has to be exactly the restore size the demo gave it.
+  On X11 the demo reads the maximized state and the geometry from the X
+  server: the toolkit reports the state late and, under KDE Plasma, keeps the
+  restore bounds while the window is maximized.
 - Leaving full screen, the window is the largest picture that fits 77% of
   each side of the work area: GNOME maximizes a window that maps wider and
   taller than 80% of the work area, and gives that maximized state back when
