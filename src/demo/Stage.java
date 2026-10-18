@@ -307,7 +307,7 @@ final class Stage extends MouseAdapter{
     desk(e, "in state "+e.getNewState());
     boolean was= (e.getOldState() & Frame.MAXIMIZED_BOTH) == Frame.MAXIMIZED_BOTH;
     boolean is= (e.getNewState() & Frame.MAXIMIZED_BOTH) == Frame.MAXIMIZED_BOTH;
-    if (!was && is && Desk.windows){ minimum(); return; }
+    if (!was && is && Desk.windows){ restore= outset(compacted(inset(fit(workArea(), leavingWidth()), f.getInsets()))); minimum(); return; }
     unmaximized= !x11Unmaximize() && was && (e.getNewState() & (Frame.MAXIMIZED_BOTH|Frame.ICONIFIED)) == 0;
     }
   private static boolean near(int a, int b){ return Math.abs(a-b) <= 1; }
