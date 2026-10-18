@@ -66,6 +66,7 @@ final class Stage extends MouseAdapter{
   boolean resizing;
   boolean dragged;
   boolean opensFullScreen;
+  boolean activating;
   boolean handed;
   Rectangle pending;
   Point pressPoint;
@@ -169,7 +170,7 @@ final class Stage extends MouseAdapter{
     f.setVisible(true);
     f.toFront();
     surface.requestFocusInWindow();
-    if (replaced && !Desk.windows){ Desk.activate(f); }
+    activating= replaced && !Desk.windows;
     if (replaced && Desk.windows){ old.dispose(); }
     }
   private Rectangle workArea(){ return Desk.cosmic ? Desk.cosmicArea : inset(screen, Toolkit.getDefaultToolkit().getScreenInsets(gc)); }
@@ -248,6 +249,7 @@ final class Stage extends MouseAdapter{
 
   private void tick(){
     if (Desk.managed){ managedState(); }
+    if (activating && Desk.managing(f)){ activating= false; Desk.activate(f); }
     if (!Desk.windows && !Desk.cosmic){ trackPress(); }
     var now= surface.getSize();
     boolean deskWindow= mode == Mode.decorated && !maximized() && !Desk.managed;

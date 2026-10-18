@@ -140,8 +140,9 @@ ends, nor its work area:
   of the keyboard without asking the X server when it already counts the window
   as focused, and the desk then never sees the window accept. Then the demo
   asks the desk to activate the new window (`_NET_ACTIVE_WINDOW`, as a pager):
-  Cinnamon otherwise can keep the keyboard on the launcher, the window it chose
-  when the old one went away. Every X11 message goes on the toolkit's own
+  Cinnamon and Xfce otherwise can keep the keyboard on the launcher, the window
+  they chose when the old one went away. The demo sends the request once the
+  desk manages the new window (`WM_STATE`). Every X11 message goes on the toolkit's own
   connection, so it reaches the desk after the request that maps the window.
 - A corner drag keeps the size the demo set last: leaving full screen,
   Cinnamon can give the window its size from before full screen a moment
