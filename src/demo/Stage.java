@@ -169,6 +169,7 @@ final class Stage extends MouseAdapter{
     f.setVisible(true);
     f.toFront();
     surface.requestFocusInWindow();
+    if (replaced && !Desk.windows){ Desk.activate(f); }
     if (replaced && Desk.windows){ old.dispose(); }
     }
   private Rectangle workArea(){ return Desk.cosmic ? Desk.cosmicArea : inset(screen, Toolkit.getDefaultToolkit().getScreenInsets(gc)); }
@@ -402,7 +403,7 @@ final class Stage extends MouseAdapter{
     int bottom= w.y+w.height;
     int x= Math.max(w.x, at.x);
     int y= Math.max(w.y, at.y);
-    var d= clamped(f.getWidth(), right-x, bottom-y);
+    var d= clamped(restore.width, right-x, bottom-y);
     return new Rectangle(Math.min(x, right-d.width), Math.min(y, bottom-d.height), d.width, d.height);
     }
   private Rectangle resized(Point at){

@@ -138,7 +138,14 @@ ends, nor its work area:
   GNOME a new undecorated window shown while the old one still has the keyboard
   can end up never receiving the keyboard. The toolkit answers the desk's offer
   of the keyboard without asking the X server when it already counts the window
-  as focused, and the desk then never sees the window accept.
+  as focused, and the desk then never sees the window accept. Then the demo
+  asks the desk to activate the new window (`_NET_ACTIVE_WINDOW`, as a pager):
+  Cinnamon otherwise can keep the keyboard on the launcher, the window it chose
+  when the old one went away. Every X11 message goes on the toolkit's own
+  connection, so it reaches the desk after the request that maps the window.
+- A corner drag keeps the size the demo set last: leaving full screen,
+  Cinnamon can give the window its size from before full screen a moment
+  after the demo has set the new one.
 - The corner double click acts on the release of the second click: a window
   replaced while a button is down leaves XWayland reporting that button down
   until the pointer next enters one of its windows.

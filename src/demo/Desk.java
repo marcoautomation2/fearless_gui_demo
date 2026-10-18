@@ -47,27 +47,7 @@ final class Desk{
     call(X11.resize, X11.display, X11.window(f), d.width, d.height);
     call(X11.flush, X11.display);
     }
-  static void moveResize(Frame f, java.awt.Point at, int direction){
-    var lock= reflect(() -> Class.forName("sun.awt.SunToolkit"));
-    reflect(() -> lock.getMethod("awtLock").invoke(null));
-    try (var a= Arena.ofConfined()){
-      var d= MemorySegment.ofAddress((long)reflect(() -> Class.forName("sun.awt.X11.XToolkit").getMethod("getDisplay").invoke(null)));
-      call(X11.ungrab, d, 0L);
-      var e= a.allocate(192);
-      e.set(ValueLayout.JAVA_INT, 0, 33);
-      e.set(ValueLayout.JAVA_LONG, 32, X11.window(f));
-      e.set(ValueLayout.JAVA_LONG, 40, X11.atom("_NET_WM_MOVERESIZE"));
-      e.set(ValueLayout.JAVA_INT, 48, 32);
-      e.set(ValueLayout.JAVA_LONG, 56, at.x);
-      e.set(ValueLayout.JAVA_LONG, 64, at.y);
-      e.set(ValueLayout.JAVA_LONG, 72, direction);
-      e.set(ValueLayout.JAVA_LONG, 80, 1);
-      e.set(ValueLayout.JAVA_LONG, 88, 1);
-      call(X11.send, d, X11.root, 0, (1L<<20)|(1L<<19), e);
-      call(X11.flush, d);
-      }
-    finally{ reflect(() -> lock.getMethod("awtUnlock").invoke(null)); }
-    }
+  static void moveResize(Frame f, java.awt.Point at, int direction){ message(f, "_NET_WM_MOVERESIZE", at.x, at.y, direction, 1, 1); }
   static final Field peer= open(reflect(() -> Component.class.getDeclaredField("peer")));
 
   static boolean down(){
@@ -82,19 +62,24 @@ final class Desk{
     return LongStream.of(X11.atoms(X11.window(f), "_NET_WM_STATE")).anyMatch(a -> a == fs);
     }
   static boolean managing(Frame f){ return X11.atoms(X11.window(f), "WM_STATE").length > 0; }
-  static void fullScreen(Frame f, boolean on){
+  static void fullScreen(Frame f, boolean on){ message(f, "_NET_WM_STATE", on ? 1 : 0, X11.atom("_NET_WM_STATE_FULLSCREEN"), 0, 1); }
+  static void activate(Frame f){ message(f, "_NET_ACTIVE_WINDOW", 2, 0, 0, 0); }
+  private static void message(Frame f, String type, long... data){
+    var lock= reflect(() -> Class.forName("sun.awt.SunToolkit"));
+    reflect(() -> lock.getMethod("awtLock").invoke(null));
     try (var a= Arena.ofConfined()){
+      var d= MemorySegment.ofAddress((long)reflect(() -> Class.forName("sun.awt.X11.XToolkit").getMethod("getDisplay").invoke(null)));
+      call(X11.ungrab, d, 0L);
       var e= a.allocate(192);
       e.set(ValueLayout.JAVA_INT, 0, 33);
       e.set(ValueLayout.JAVA_LONG, 32, X11.window(f));
-      e.set(ValueLayout.JAVA_LONG, 40, X11.atom("_NET_WM_STATE"));
+      e.set(ValueLayout.JAVA_LONG, 40, X11.atom(type));
       e.set(ValueLayout.JAVA_INT, 48, 32);
-      e.set(ValueLayout.JAVA_LONG, 56, on ? 1 : 0);
-      e.set(ValueLayout.JAVA_LONG, 64, X11.atom("_NET_WM_STATE_FULLSCREEN"));
-      e.set(ValueLayout.JAVA_LONG, 80, 1);
-      call(X11.send, X11.display, X11.root, 0, (1L<<20)|(1L<<19), e);
-      call(X11.flush, X11.display);
+      for (int i= 0; i < data.length; i+= 1){ e.set(ValueLayout.JAVA_LONG, 56+8*i, data[i]); }
+      call(X11.send, d, X11.root, 0, (1L<<20)|(1L<<19), e);
+      call(X11.flush, d);
       }
+    finally{ reflect(() -> lock.getMethod("awtUnlock").invoke(null)); }
     }
   static void restoreSize(Frame f, Rectangle r, boolean maximized){
     var gc= f.getGraphicsConfiguration();
