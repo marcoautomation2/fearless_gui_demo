@@ -224,7 +224,7 @@ final class Stage extends MouseAdapter{
     return Math.min(Math.sqrt(area*screen.width*screen.height*canvasW/canvasH), fitWidth(w.width, w.height));
     }
   private Dimension clamped(double w, int roomW, int roomH){ return size(Math.max(Math.min(w, fitWidth(roomW, roomH)), areaWidth(c.minArea()))); }
-  private boolean maximized(){ return mode == Mode.decorated && (f.getExtendedState() & Frame.MAXIMIZED_BOTH) == Frame.MAXIMIZED_BOTH; }
+  private boolean maximized(){ return mode == Mode.decorated && !Desk.managed && (f.getExtendedState() & Frame.MAXIMIZED_BOTH) == Frame.MAXIMIZED_BOTH; }
   private String state(){ return (Desk.managed && mode == Mode.decorated ? "managed" : mode.toString())+(maximized() ? " maximized" : ""); }
 
   private void request(Dimension d){
