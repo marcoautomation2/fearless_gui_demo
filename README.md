@@ -47,9 +47,9 @@ floating desk.
     Corner double click      1 to 4, 2 to 4, on the release of the second click.
     Full screen key          1 to 2; 2, 3, 4 to 1.
     Desk maximize            4 to 3.
-    Desk unmaximize          3 to 1 when the window has not moved by the time no
-                             mouse button is down; a title bar drag (it moved)
-                             stays in 4 and is compacted.
+    Desk unmaximize          3 to 1, once no mouse button is down; a title bar
+                             drag (the pointer moved with a button down) stays
+                             in 4 and is compacted.
     In every state the picture covers at least the min screen area.
 
 ## KDE Plasma on Wayland
@@ -109,9 +109,14 @@ ends, nor its work area:
   ratio of every request; without it the bands stay until the window changes.
 - After a desk resize, the demo compacts the window on the first repaint tick
   with no mouse button down: a desk resize by the pointer lasts as long as a
-  button is held. After an unmaximize, once no button is down, a window that is
-  exactly the restore size the demo gave it goes to full screen; a window the
-  desk moved (a title bar drag) or arranged (a snap) stays a desk window.
+  button is held. After an unmaximize, once no button is down, the window goes
+  to full screen unless the pointer moved past the drag threshold with a
+  button down (a title bar drag): GNOME gives back a large restore size
+  resized. On Windows and COSMIC the window goes to full screen when it is
+  exactly the restore size the demo gave it.
+- GNOME maximizes a window that maps covering more than 80% of the work area;
+  the demo takes a Fearless window out of that maximized state and sets its
+  bounds again.
   `Desk` reads the button state from the platform: `GetAsyncKeyState` on
   Windows, `XQueryPointer` on X11, `CGEventSourceButtonState` on macOS.
 - The desk keeps no size of an earlier window. On Windows, each compaction
