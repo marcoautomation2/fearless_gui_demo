@@ -114,9 +114,11 @@ ends, nor its work area:
   button down (a title bar drag): GNOME gives back a large restore size
   resized. On Windows and COSMIC the window goes to full screen when it is
   exactly the restore size the demo gave it.
-- GNOME maximizes a window that maps covering more than 80% of the work area;
-  the demo takes a Fearless window out of that maximized state and sets its
-  bounds again.
+- Leaving full screen, the window is the largest picture that fits 77% of
+  each side of the work area: GNOME maximizes a window that maps wider and
+  taller than 80% of the work area, and gives that maximized state back when
+  the window leaves full screen. Off Windows the demo maps a window entering
+  full screen at that size first.
   `Desk` reads the button state from the platform: `GetAsyncKeyState` on
   Windows, `XQueryPointer` on X11, `CGEventSourceButtonState` on macOS.
 - The desk keeps no size of an earlier window. On Windows, each compaction

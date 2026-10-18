@@ -68,7 +68,6 @@ final class Stage extends MouseAdapter{
   boolean opensFullScreen;
   boolean handed;
   Rectangle pending;
-  Rectangle refit;
   Point pressPoint;
   double moved;
 
@@ -142,7 +141,7 @@ final class Stage extends MouseAdapter{
     }
   private void realize(Mode m, String why){
     var old= f;
-    var r= old != null && mode != Mode.fullScreen ? old.getBounds() : fit(workArea(), old == null ? areaWidth(c.screenArea()) : workArea().width);
+    var r= old != null && mode != Mode.fullScreen ? old.getBounds() : fit(workArea(), old == null ? areaWidth(c.screenArea()) : leavingWidth());
     boolean undecorated= m != Mode.decorated;
     log((old == null ? "" : state()+" -> ")+m+" by "+why);
     if (old == null || old.isUndecorated() != undecorated){ f= makeFrame(undecorated); }
@@ -154,6 +153,7 @@ final class Stage extends MouseAdapter{
     switch (m){
       case fullScreen -> {
         Main.stages.stream().filter(s -> s.f == device.getFullScreenWindow()).forEach(s -> s.realize(Mode.fearless, "#"+id+" taking full screen"));
+        if (!Desk.windows && !f.isShowing()){ place(fit(workArea(), leavingWidth())); f.setVisible(true); }
         device.setFullScreenWindow(f);
         }
       case fearless -> {
@@ -214,6 +214,10 @@ final class Stage extends MouseAdapter{
     var d= size(Math.min(w, fitWidth(r.width, r.height)));
     return new Rectangle(r.x+(r.width-d.width)/2, r.y+(r.height-d.height)/2, d.width, d.height);
     }
+  private double leavingWidth(){
+    var w= workArea();
+    return 0.77*fitWidth(w.width, w.height);
+    }
   private double areaWidth(double area){
     var w= workArea();
     return Math.min(Math.sqrt(area*screen.width*screen.height*canvasW/canvasH), fitWidth(w.width, w.height));
@@ -244,9 +248,6 @@ final class Stage extends MouseAdapter{
   private void tick(){
     if (Desk.managed){ managedState(); }
     if (!Desk.windows && !Desk.cosmic){ trackPress(); }
-    boolean deskMaximized= (f.getExtendedState() & Frame.MAXIMIZED_BOTH) != 0;
-    if (mode == Mode.fearless && !Desk.windows && deskMaximized && refit == null){ unmaximizeFearless(); }
-    if (refit != null && !deskMaximized){ place(inset(refit, f.getInsets())); refit= null; }
     var now= surface.getSize();
     boolean deskWindow= mode == Mode.decorated && !maximized() && !Desk.managed;
     deskResized&= deskWindow;
@@ -296,11 +297,6 @@ final class Stage extends MouseAdapter{
     boolean is= (e.getNewState() & Frame.MAXIMIZED_BOTH) == Frame.MAXIMIZED_BOTH;
     if (!was && is && Desk.windows){ Desk.restoreSize(f, restore, true); return; }
     unmaximized= was && (e.getNewState() & (Frame.MAXIMIZED_BOTH|Frame.ICONIFIED)) == 0;
-    }
-  private void unmaximizeFearless(){
-    log("the desk maximized a Fearless window: back to its bounds");
-    refit= restore;
-    f.setExtendedState(Frame.NORMAL);
     }
   private static boolean near(int a, int b){ return Math.abs(a-b) <= 1; }
   private void trackPress(){
