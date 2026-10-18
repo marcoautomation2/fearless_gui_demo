@@ -157,7 +157,12 @@ ends, nor its work area:
 - A desk window has the desk's minimum size: the smallest window whose picture
   covers the min screen area. The Windows peer of the toolkit hands the desk
   the minimum size in user space, and the desk reads it in device pixels, so
-  on Windows the frame reports it multiplied by the display scale.
+  on Windows the frame reports it multiplied by the display scale to the peer;
+  the toolkit's own clamp of every size the window is given still gets the
+  minimum size in user space. Windows restores a maximized window to at least
+  its minimum size, and a request while the window is maximized can raise the
+  minimum size: on Windows the demo grows the restore size to the minimum size
+  each time it sets the minimum size of a maximized window.
 - The close key and the close button never close by themselves: they ask.
   With `Ask before closing` the question is drawn inside the picture.
 - With `Pulse the opacity` the window opacity swings between the floor and

@@ -56,7 +56,7 @@ final class Stage extends MouseAdapter{
   boolean deskResized;
   boolean unmaximized;
   Rectangle restore;
-  boolean placing;
+  boolean reshaping;
   int requests;
   String lastRequest= "none";
   String subtitle= "";
@@ -90,8 +90,13 @@ final class Stage extends MouseAdapter{
       @Override public Dimension getMinimumSize(){
         var d= super.getMinimumSize();
         // The Windows peer gives the desk the minimum size in user space, and the desk reads it in device pixels
-        double k= placing || !Desk.windows ? 1 : gc.getDefaultTransform().getScaleX();
+        double k= reshaping || !Desk.windows ? 1 : gc.getDefaultTransform().getScaleX();
         return new Dimension((int)Math.ceil(d.width*k), (int)Math.ceil(d.height*k));
+        }
+      @SuppressWarnings("deprecation") @Override public void reshape(int x, int y, int width, int height){
+        reshaping= true;
+        super.reshape(x, y, width, height);
+        reshaping= false;
         }
       };
     frame.setUndecorated(undecorated);
@@ -183,16 +188,19 @@ final class Stage extends MouseAdapter{
     }
   private void place(Rectangle content){
     chosen= content.getSize();
-    placing= true;
     f.setBounds(outset(content));
-    placing= false;
     restore= f.getBounds();
     if (Desk.cosmic){ pending= restore; }
     }
   private void minimum(){
     var in= f.getInsets();
     var d= size(areaWidth(c.minArea()));
-    f.setMinimumSize(new Dimension(d.width+in.left+in.right, d.height+in.top+in.bottom));
+    var m= new Dimension(d.width+in.left+in.right, d.height+in.top+in.bottom);
+    f.setMinimumSize(m);
+    if (!maximized() || !Desk.windows){ return; }
+    // The desk restores a maximized window to at least its minimum size
+    restore.setSize(Math.max(restore.width, m.width), Math.max(restore.height, m.height));
+    Desk.restoreSize(f, restore, true);
     }
   private Rectangle compacted(Rectangle r){
     var d= size(fitWidth(r.width, r.height));
@@ -256,7 +264,7 @@ final class Stage extends MouseAdapter{
     boolean deskWindow= mode == Mode.decorated && !maximized() && !Desk.managed;
     deskResized&= deskWindow;
     if (Desk.cosmic){ cosmicTick(deskWindow); }
-    else if (deskWindow && !unmaximized && (Desk.resizeUnseen || f.getSize().equals(restore.getSize()))){ restore= f.getBounds(); }
+    else if (deskWindow && !unmaximized && (Desk.resizeUnseen || sameSize(f.getBounds(), restore))){ restore= f.getBounds(); }
     boolean deskChose= !near(now.width, chosen.width) || !near(now.height, chosen.height);
     if (!now.equals(lastSize) && deskChose){ deskResized|= deskWindow && !Desk.resizeUnseen; request(now); }
     lastSize= now;
@@ -299,7 +307,7 @@ final class Stage extends MouseAdapter{
     desk(e, "in state "+e.getNewState());
     boolean was= (e.getOldState() & Frame.MAXIMIZED_BOTH) == Frame.MAXIMIZED_BOTH;
     boolean is= (e.getNewState() & Frame.MAXIMIZED_BOTH) == Frame.MAXIMIZED_BOTH;
-    if (!was && is && Desk.windows){ Desk.restoreSize(f, restore, true); return; }
+    if (!was && is && Desk.windows){ minimum(); return; }
     unmaximized= !x11Unmaximize() && was && (e.getNewState() & (Frame.MAXIMIZED_BOTH|Frame.ICONIFIED)) == 0;
     }
   private static boolean near(int a, int b){ return Math.abs(a-b) <= 1; }
