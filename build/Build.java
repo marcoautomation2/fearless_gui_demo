@@ -37,7 +37,7 @@ public final class Build{
       "--output", runtime.toString(),
       "--no-header-files", "--no-man-pages", "--strip-debug", "--compress", "zip-0"));
     var icon= root.resolve("packaging").resolve(windows ? "windows/icon.ico" : "linux/icon.png");
-    var options= windows ? List.of("--add-opens", "java.desktop/java.awt=demo", "--add-opens", "java.desktop/sun.awt.windows=demo") : List.<String>of();
+    var options= List.of("--add-opens", "java.desktop/java.awt=demo", windows ? "--add-opens" : "--add-exports", windows ? "java.desktop/sun.awt.windows=demo" : "java.desktop/sun.awt.X11=demo", "--add-exports", "java.desktop/sun.awt=demo");
     var jpackage= new ArrayList<>(List.of(
       "--type", "app-image",
       "--dest", app.toString(),

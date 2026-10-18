@@ -23,16 +23,20 @@ closed) and uncaught exception.
 When a window seems to vanish, the log says what the program last did and what
 the desk last reported.
 
-## The four states
+## The four states of a floating desk
 
-The demo follows the state machine of the design document; the terms are the
+The demo follows the state machines of the design document; the terms are the
 ones defined there (virtual pixel space, picture, bands, content area).
+A tiling desk (Hyprland, sway, i3: `XDG_CURRENT_DESKTOP` names one of them, or
+`SWAYSOCK` is set) has its own two states, below; every other desk is a
+floating desk.
 
     State 1: FullScreen       Fearless corner, the desk's full screen.
     State 2: FearlessWindow   Fearless corner and resize handle; the window is
                               the picture, so there are no bands.
     State 3: DeskMaximized    desk border, the desk's maximized state; the restore
-                              size is the largest desk window in the work area.
+                              size is the last desk window the user saw before the
+                              maximize, whatever the virtual pixel space does after.
     State 4: DeskWindow       desk border, not maximized; the window is compacted,
                               so there are no bands once the desk has finished
                               resizing it.
@@ -40,13 +44,60 @@ ones defined there (virtual pixel space, picture, bands, content area).
     Corner drag              1 to 2, the drag going on; in 2 it moves the window.
     Resize handle drag       in 2 it resizes the window, bottom right fixed.
     Release within screenHeight/16 of the top left of the work area: 2 to 1.
-    Corner double click      1 to 4, 2 to 4.
+    Corner double click      1 to 4, 2 to 4, on the release of the second click.
     Full screen key          1 to 2; 2, 3, 4 to 1.
-    Desk maximize            4 to 3: a new window, maximized.
-    Desk unmaximize          3 to 1 when the window has not moved by the time no
-                             mouse button is down; a title bar drag (it moved)
-                             stays in 4 and is compacted.
+    Desk maximize            4 to 3.
+    Desk unmaximize          3 to 1 when the desk puts the window back at its
+                             restore position; a title bar drag (the window
+                             lands under the pointer) stays in 4 and is
+                             compacted.
     In every state the picture covers at least the min screen area.
+
+## KDE Plasma on Wayland
+
+Like COSMIC, KDE Plasma on Wayland (`XDG_CURRENT_DESKTOP` names KDE and
+`WAYLAND_DISPLAY` is set) tells no X11 client when a resize by its border
+ends: after a desk resize a desk window keeps its bands. A window it tiles to
+half the screen keeps the tile size after the swap button, with bands.
+KDE Plasma marks a borderless window that covers the height of the work area
+as maximized; the demo takes the maximized state into account only for a
+window with the desk border.
+
+## COSMIC
+
+COSMIC (`XDG_CURRENT_DESKTOP` names it) is a floating desk that chooses the
+position of every window and tells no X11 client when a resize by its border
+ends, nor its work area:
+- After a desk resize, a desk window keeps its bands.
+- The swap button keeps the top left of the window and shrinks it to fit the
+  work area.
+- In a Fearless window the corner drag and the resize handle go on as the
+  desk's move and resize (`_NET_WM_MOVERESIZE`); at the release the demo fits
+  the window in the work area, compacts it after a resize, and a release at
+  the top left gives full screen. A corner drag out of full screen gives a
+  Fearless window without going on.
+- The work area is guessed from COSMIC's default panel and dock, and the
+  left, right and bottom edges are learned from a maximized window.
+- The demo takes positions and sizes from the X server and sets sizes with
+  `XResizeWindow`: the toolkit keeps a guess of the insets and a stale
+  position. It sets the size again once COSMIC manages a new window or has
+  ended full screen, and decides an unmaximize once the window has the
+  restore size.
+
+## The two states of a tiling desk
+
+    State 1: FullScreen       Fearless corner, the desk's full screen.
+    State M: DeskManaged      Fearless corner; the desk chooses the size and the
+                              position, tiled or floating; bands when the aspect
+                              ratios differ.
+
+    Corner double click      1 to M, M to 1.
+    Full screen key          1 to M, M to 1.
+    The desk's full screen   1 to M, M to 1 (Super+F on Omarchy).
+    Corner drag              nothing.
+    The demo asks the desk for full screen with the `_NET_WM_STATE` message and
+    takes the state from `_NET_WM_STATE_FULLSCREEN` on each repaint tick; it
+    never sets the size or the position of the window after it opens.
 
 ## Other behaviours
 
@@ -59,21 +110,59 @@ ones defined there (virtual pixel space, picture, bands, content area).
   ratio of every request; without it the bands stay until the window changes.
 - After a desk resize, the demo compacts the window on the first repaint tick
   with no mouse button down: a desk resize by the pointer lasts as long as a
-  button is held. After an unmaximize, once no button is down, a window that is
-  exactly the restore size the demo gave it goes to full screen; a window the
-  desk moved (a title bar drag) or arranged (a snap) stays a desk window.
+  button is held. After an unmaximize the demo decides on the first position
+  the desk reports: at the restore position the window goes to full screen,
+  elsewhere the desk moved it (a title bar drag). Only the position counts:
+  GNOME gives back a large restore size resized. On Windows and COSMIC the
+  window also has to be exactly the restore size the demo gave it.
+  On X11 the demo reads the maximized state and the geometry from the X
+  server: the toolkit reports the state late and, under KDE Plasma, keeps the
+  restore bounds while the window is maximized.
+- Leaving full screen, the window is the largest picture that fits 77% of
+  each side of the work area: GNOME maximizes a window that maps wider and
+  taller than 80% of the work area, and gives that maximized state back when
+  the window leaves full screen. Off Windows the demo maps a window entering
+  full screen at that size first.
   `Desk` reads the button state from the platform: `GetAsyncKeyState` on
   Windows, `XQueryPointer` on X11, `CGEventSourceButtonState` on macOS.
 - The desk keeps no size of an earlier window. On Windows, each compaction
   also sets the window's restore size to its current size with
   `SetWindowPlacement`, which ends a snap: Java's `setBounds` moves a snapped
   window but leaves the size from before the snap as its restore size. When
-  the desk maximizes a window, the demo sets its restore size the same way.
-  On other desks a maximize replaces the window with a new maximized one.
+  the desk maximizes a window, the demo sets its restore size to the window
+  before the maximize.
+  On other desks the desk maximizes the window itself and keeps the window
+  before the maximize as its restore size: GNOME restores a window mapped
+  already maximized to the size it was given, but at the top left of the work
+  area. A window the desk tiles to half the screen is maximized vertically
+  only, and stays a desk window.
+- A new window replaces the old one when the window moves between the desk
+  border and the Fearless corner. On Windows the new window is shown first and
+  the old one is disposed after. Elsewhere the old one is disposed first: under
+  GNOME a new undecorated window shown while the old one still has the keyboard
+  can end up never receiving the keyboard. The toolkit answers the desk's offer
+  of the keyboard without asking the X server when it already counts the window
+  as focused, and the desk then never sees the window accept. Then the demo
+  asks the desk to activate the new window (`_NET_ACTIVE_WINDOW`, as a pager):
+  Cinnamon and Xfce otherwise can keep the keyboard on the launcher, the window
+  they chose when the old one went away. The demo sends the request once the
+  desk manages the new window (`WM_STATE`). Every X11 message goes on the toolkit's own
+  connection, so it reaches the desk after the request that maps the window.
+- A corner drag keeps the size the demo set last: leaving full screen,
+  Cinnamon can give the window its size from before full screen a moment
+  after the demo has set the new one.
+- The corner double click acts on the release of the second click: a window
+  replaced while a button is down leaves XWayland reporting that button down
+  until the pointer next enters one of its windows.
 - A desk window has the desk's minimum size: the smallest window whose picture
   covers the min screen area. The Windows peer of the toolkit hands the desk
   the minimum size in user space, and the desk reads it in device pixels, so
-  on Windows the frame reports it multiplied by the display scale.
+  on Windows the frame reports it multiplied by the display scale to the peer;
+  the toolkit's own clamp of every size the window is given still gets the
+  minimum size in user space. Windows restores a maximized window to at least
+  its minimum size, and a request while the window is maximized can raise the
+  minimum size: on Windows the demo grows the restore size to the minimum size
+  each time it sets the minimum size of a maximized window.
 - The close key and the close button never close by themselves: they ask.
   With `Ask before closing` the question is drawn inside the picture.
 - With `Pulse the opacity` the window opacity swings between the floor and
@@ -86,8 +175,9 @@ ones defined there (virtual pixel space, picture, bands, content area).
   pipeline makes full screen an exclusive mode of the display, and on a desk
   scaled above 100% the bounds set while leaving it reach the native window
   unscaled. Run from a JDK, pass the same option, `--enable-native-access=demo`,
-  and on Windows `--add-opens java.desktop/java.awt=demo` and
-  `--add-opens java.desktop/sun.awt.windows=demo` (the window handle).
+  `--add-opens java.desktop/java.awt=demo`, and on Windows
+  `--add-opens java.desktop/sun.awt.windows=demo` (the window handle), on
+  Linux `--add-exports java.desktop/sun.awt.X11=demo` (the X11 window).
 - The windows opened by `Show` share one program, and a program has one full
   screen window: a window entering full screen first turns the full screen
   window of another `Show` into a Fearless window.
