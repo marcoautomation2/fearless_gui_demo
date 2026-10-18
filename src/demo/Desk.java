@@ -27,6 +27,46 @@ final class Desk{
   static final boolean mac= System.getProperty("os.name").startsWith("Mac");
   static final boolean managed= System.getenv("SWAYSOCK") != null
     || Stream.of(Objects.requireNonNullElse(System.getenv("XDG_CURRENT_DESKTOP"), "").split(":")).map(d -> d.toLowerCase(Locale.ROOT)).anyMatch(List.of("hyprland", "sway", "i3")::contains);
+  static final boolean cosmic= Stream.of(Objects.requireNonNullElse(System.getenv("XDG_CURRENT_DESKTOP"), "").split(":")).anyMatch("COSMIC"::equalsIgnoreCase);
+  static Rectangle cosmicArea= cosmicGuess();
+  private static Rectangle cosmicGuess(){
+    var s= java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration().getBounds();
+    return new Rectangle(s.x, s.y+s.height/30, s.width, s.height-s.height/30-s.height/14);
+    }
+  static Rectangle bounds(Frame f){
+    try (var a= Arena.ofConfined()){
+      var g= a.allocate(48);
+      call(X11.geometry, X11.display, X11.window(f), g, g.asSlice(8), g.asSlice(12), g.asSlice(16), g.asSlice(20), g.asSlice(24), g.asSlice(28));
+      var t= a.allocate(24);
+      call(X11.translate, X11.display, X11.window(f), X11.root, 0, 0, t, t.asSlice(4), t.asSlice(8));
+      return new Rectangle(t.get(ValueLayout.JAVA_INT, 0), t.get(ValueLayout.JAVA_INT, 4), g.get(ValueLayout.JAVA_INT, 16), g.get(ValueLayout.JAVA_INT, 20));
+      }
+    }
+  static void resize(Frame f, java.awt.Dimension d){
+    call(X11.resize, X11.display, X11.window(f), d.width, d.height);
+    call(X11.flush, X11.display);
+    }
+  static void moveResize(Frame f, java.awt.Point at, int direction){
+    var lock= reflect(() -> Class.forName("sun.awt.SunToolkit"));
+    reflect(() -> lock.getMethod("awtLock").invoke(null));
+    try (var a= Arena.ofConfined()){
+      var d= MemorySegment.ofAddress((long)reflect(() -> Class.forName("sun.awt.X11.XToolkit").getMethod("getDisplay").invoke(null)));
+      call(X11.ungrab, d, 0L);
+      var e= a.allocate(192);
+      e.set(ValueLayout.JAVA_INT, 0, 33);
+      e.set(ValueLayout.JAVA_LONG, 32, X11.window(f));
+      e.set(ValueLayout.JAVA_LONG, 40, X11.atom("_NET_WM_MOVERESIZE"));
+      e.set(ValueLayout.JAVA_INT, 48, 32);
+      e.set(ValueLayout.JAVA_LONG, 56, at.x);
+      e.set(ValueLayout.JAVA_LONG, 64, at.y);
+      e.set(ValueLayout.JAVA_LONG, 72, direction);
+      e.set(ValueLayout.JAVA_LONG, 80, 1);
+      e.set(ValueLayout.JAVA_LONG, 88, 1);
+      call(X11.send, d, X11.root, 0, (1L<<20)|(1L<<19), e);
+      call(X11.flush, d);
+      }
+    finally{ reflect(() -> lock.getMethod("awtUnlock").invoke(null)); }
+    }
   static final Field peer= open(reflect(() -> Component.class.getDeclaredField("peer")));
 
   static boolean down(){
@@ -113,6 +153,12 @@ final class Desk{
       ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
     static final MethodHandle free= fn(lib, "XFree", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
     static final MethodHandle send= fn(lib, "XSendEvent", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
+    static final MethodHandle geometry= fn(lib, "XGetGeometry", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG,
+      ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+    static final MethodHandle translate= fn(lib, "XTranslateCoordinates", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG,
+      ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+    static final MethodHandle resize= fn(lib, "XResizeWindow", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
+    static final MethodHandle ungrab= fn(lib, "XUngrabPointer", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG));
     static final MethodHandle flush= fn(lib, "XFlush", FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
     static final Method window= reflect(() -> Class.forName("sun.awt.X11.XBaseWindow").getMethod("getWindow"));
     static long window(Frame f){ return (long)reflect(() -> window.invoke(reflect(() -> peer.get(f)))); }

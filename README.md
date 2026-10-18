@@ -52,6 +52,27 @@ floating desk.
                              stays in 4 and is compacted.
     In every state the picture covers at least the min screen area.
 
+## COSMIC
+
+COSMIC (`XDG_CURRENT_DESKTOP` names it) is a floating desk that chooses the
+position of every window and tells no X11 client when a resize by its border
+ends, nor its work area:
+- After a desk resize, a desk window keeps its bands.
+- The swap button keeps the top left of the window and shrinks it to fit the
+  work area.
+- In a Fearless window the corner drag and the resize handle go on as the
+  desk's move and resize (`_NET_WM_MOVERESIZE`); at the release the demo fits
+  the window in the work area, compacts it after a resize, and a release at
+  the top left gives full screen. A corner drag out of full screen gives a
+  Fearless window without going on.
+- The work area is guessed from COSMIC's default panel and dock, and the
+  left, right and bottom edges are learned from a maximized window.
+- The demo takes positions and sizes from the X server and sets sizes with
+  `XResizeWindow`: the toolkit keeps a guess of the insets and a stale
+  position. It sets the size again once COSMIC manages a new window or has
+  ended full screen, and decides an unmaximize once the window has the
+  restore size.
+
 ## The two states of a tiling desk
 
     State 1: FullScreen       Fearless corner, the desk's full screen.

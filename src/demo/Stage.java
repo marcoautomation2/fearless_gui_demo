@@ -41,7 +41,6 @@ final class Stage extends MouseAdapter{
   final GraphicsDevice device= GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
   final GraphicsConfiguration gc= device.getDefaultConfiguration();
   final Rectangle screen= gc.getBounds();
-  final Rectangle workArea= inset(screen, Toolkit.getDefaultToolkit().getScreenInsets(gc));
   final boolean translucent= device.isWindowTranslucencySupported(GraphicsDevice.WindowTranslucency.TRANSLUCENT);
   final JComponent surface= new JComponent(){ @Override protected void paintComponent(Graphics g){ paintSurface((Graphics2D)g); } };
   final Content content;
@@ -66,6 +65,8 @@ final class Stage extends MouseAdapter{
   boolean resizing;
   boolean dragged;
   boolean opensFullScreen;
+  boolean handed;
+  Rectangle pending;
 
   Stage(int id, Config c){
     this.id= id;
@@ -129,7 +130,7 @@ final class Stage extends MouseAdapter{
     mode= Mode.decorated;
     log("managed by the program");
     f.pack();
-    place(compacted(inset(fit(workArea, areaWidth(c.screenArea())), f.getInsets())));
+    place(compacted(inset(fit(workArea(), areaWidth(c.screenArea())), f.getInsets())));
     minimum();
     opensFullScreen= c.opensAs() == Mode.fullScreen;
     f.setVisible(true);
@@ -137,7 +138,7 @@ final class Stage extends MouseAdapter{
     }
   private void realize(Mode m, String why){
     var old= f;
-    var r= old != null && mode != Mode.fullScreen ? old.getBounds() : fit(workArea, old == null ? areaWidth(c.screenArea()) : workArea.width);
+    var r= old != null && mode != Mode.fullScreen ? old.getBounds() : fit(workArea(), old == null ? areaWidth(c.screenArea()) : workArea().width);
     boolean undecorated= m != Mode.decorated;
     log((old == null ? "" : state()+" -> ")+m+" by "+why);
     if (old == null || old.isUndecorated() != undecorated){ f= makeFrame(undecorated); }
@@ -166,6 +167,7 @@ final class Stage extends MouseAdapter{
     surface.requestFocusInWindow();
     if (replaced && Desk.windows){ old.dispose(); }
     }
+  private Rectangle workArea(){ return Desk.cosmic ? Desk.cosmicArea : inset(screen, Toolkit.getDefaultToolkit().getScreenInsets(gc)); }
   private static Rectangle inset(Rectangle r, Insets in){ return new Rectangle(r.x+in.left, r.y+in.top, r.width-in.left-in.right, r.height-in.top-in.bottom); }
   private static int within(int v, int low, int high){ return Math.max(low, Math.min(v, high)); }
   private Rectangle outset(Rectangle content){
@@ -178,6 +180,7 @@ final class Stage extends MouseAdapter{
     f.setBounds(outset(content));
     placing= false;
     restore= f.getBounds();
+    if (Desk.cosmic){ pending= restore; }
     }
   private void minimum(){
     var in= f.getInsets();
@@ -189,7 +192,11 @@ final class Stage extends MouseAdapter{
     return new Rectangle(r.x+(r.width-d.width)/2, r.y, d.width, d.height);
     }
   private Rectangle rescaled(Rectangle r){
-    var room= inset(workArea, f.getInsets());
+    var room= inset(workArea(), f.getInsets());
+    if (Desk.cosmic){
+      var d= clamped(Math.sqrt(r.width*(double)r.height*canvasW/canvasH), room.x+room.width-r.x, room.y+room.height-r.y);
+      return new Rectangle(r.x, r.y, d.width, d.height);
+      }
     var d= clamped(Math.sqrt(r.width*(double)r.height*canvasW/canvasH), room.width, room.height);
     int x= within(r.x+(r.width-d.width)/2, room.x, room.x+room.width-d.width);
     return new Rectangle(x, within(r.y+(r.height-d.height)/2, room.y, room.y+room.height-d.height), d.width, d.height);
@@ -203,7 +210,10 @@ final class Stage extends MouseAdapter{
     var d= size(Math.min(w, fitWidth(r.width, r.height)));
     return new Rectangle(r.x+(r.width-d.width)/2, r.y+(r.height-d.height)/2, d.width, d.height);
     }
-  private double areaWidth(double area){ return Math.min(Math.sqrt(area*screen.width*screen.height*canvasW/canvasH), fitWidth(workArea.width, workArea.height)); }
+  private double areaWidth(double area){
+    var w= workArea();
+    return Math.min(Math.sqrt(area*screen.width*screen.height*canvasW/canvasH), fitWidth(w.width, w.height));
+    }
   private Dimension clamped(double w, int roomW, int roomH){ return size(Math.max(Math.min(w, fitWidth(roomW, roomH)), areaWidth(c.minArea()))); }
   private boolean maximized(){ return (f.getExtendedState() & Frame.MAXIMIZED_BOTH) == Frame.MAXIMIZED_BOTH; }
   private String state(){ return (Desk.managed && mode == Mode.decorated ? "managed" : mode.toString())+(maximized() ? " maximized" : ""); }
@@ -218,7 +228,7 @@ final class Stage extends MouseAdapter{
     }
   void canvas(int w, int h){
     if (w == canvasW && h == canvasH){ return; }
-    var old= inset(f.getBounds(), f.getInsets());
+    var old= inset(bounds(), f.getInsets());
     canvasW= w;
     canvasH= h;
     log("virtual pixel space "+w+"x"+h);
@@ -232,15 +242,37 @@ final class Stage extends MouseAdapter{
     var now= surface.getSize();
     boolean deskWindow= mode == Mode.decorated && !maximized() && !Desk.managed;
     deskResized&= deskWindow;
-    if (deskWindow && f.getSize().equals(restore.getSize())){ restore= f.getBounds(); }
+    if (Desk.cosmic){ cosmicTick(deskWindow); }
+    else if (deskWindow && f.getSize().equals(restore.getSize())){ restore= f.getBounds(); }
     boolean deskChose= !near(now.width, chosen.width) || !near(now.height, chosen.height);
-    if (!now.equals(lastSize) && deskChose){ deskResized|= deskWindow; request(now); }
+    if (!now.equals(lastSize) && deskChose){ deskResized|= deskWindow && !Desk.cosmic; request(now); }
     lastSize= now;
-    if (unmaximized && !Desk.down()){ unmaximized(); return; }
+    if (unmaximized && (Desk.cosmic ? sameSize(f.getBounds(), restore) : !Desk.down())){ unmaximized(); return; }
     if (deskResized && !Desk.down()){ compact(); }
     if (mode == Mode.fearless && translucent && c.pulse()){ f.setOpacity((float)(c.opacityFloor()+(1-c.opacityFloor())*(0.5+0.5*Math.cos((System.nanoTime()-t0)/0.5e9)))); }
     surface.repaint();
     }
+  private void cosmicTick(boolean deskWindow){
+    if (maximized()){
+      var m= Desk.bounds(f);
+      int top= Desk.cosmicArea.y;
+      Desk.cosmicArea= new Rectangle(m.x, top, m.width, m.y+m.height-top);
+      }
+    if (deskWindow && !unmaximized && pending == null){ restore= f.getBounds(); }
+    if (pending == null || !Desk.managing(f) || Desk.fullScreen(f)){ return; }
+    var real= Desk.bounds(f);
+    if (real.equals(screen)){ return; }
+    var in= f.getInsets();
+    var room= inset(workArea(), in);
+    var d= clamped(pending.width-in.left-in.right, room.x+room.width-real.x, room.y+room.height-real.y);
+    pending= null;
+    if (real.getSize().equals(d)){ return; }
+    chosen= d;
+    log("fitting the window in the work area");
+    Desk.resize(f, d);
+    }
+  private Rectangle bounds(){ return Desk.cosmic ? outset(Desk.bounds(f)) : f.getBounds(); }
+  private static boolean sameSize(Rectangle a, Rectangle b){ return near(a.width, b.width) && near(a.height, b.height); }
   private void managedState(){
     if (opensFullScreen && Desk.managing(f)){ opensFullScreen= false; Desk.fullScreen(f, true); }
     var m= Desk.fullScreen(f) ? Mode.fullScreen : Mode.decorated;
@@ -321,6 +353,7 @@ final class Stage extends MouseAdapter{
     var p= e.getLocationOnScreen();
     if (!dragged && p.distance(pressAt) <= DragSource.getDragThreshold()){ return; }
     dragged= true;
+    if (Desk.cosmic){ handOver(p); return; }
     if (mode == Mode.fullScreen){ realize(Mode.fearless, "a corner drag"); }
     var at= new Point(pressBounds.x+p.x-pressAt.x, pressBounds.y+p.y-pressAt.y);
     place(resizing ? resized(at) : moved(at));
@@ -331,21 +364,33 @@ final class Stage extends MouseAdapter{
     if (e.getClickCount() == 2 && inCorner(e.getPoint())){ realize(Mode.decorated, "a corner double click"); return; }
     if (pressAt == null){ return; }
     pressAt= null;
+    if (handed){ handed= false; log("the drag has ended"); }
+    if (Desk.cosmic && dragged && mode == Mode.fearless){ pending= resizing ? compacted(bounds()) : bounds(); }
     if (!dragged || mode != Mode.fearless){ return; }
-    if (e.getLocationOnScreen().distance(workArea.getLocation()) <= screen.height/16){ realize(Mode.fullScreen, "a corner drop at the top left"); }
+    var b= bounds();
+    if (new Point(b.x+e.getX(), b.y+e.getY()).distance(workArea().getLocation()) <= screen.height/16){ realize(Mode.fullScreen, "a corner drop at the top left"); }
+    }
+  private void handOver(Point p){
+    if (handed){ return; }
+    handed= true;
+    if (mode == Mode.fullScreen){ realize(Mode.fearless, "a corner drag"); return; }
+    log("the drag goes on as the desk's "+(resizing ? "resize" : "move"));
+    Desk.moveResize(f, p, resizing ? 0 : 8);
     }
   private Rectangle moved(Point at){
-    int right= workArea.x+workArea.width;
-    int bottom= workArea.y+workArea.height;
-    int x= Math.max(workArea.x, at.x);
-    int y= Math.max(workArea.y, at.y);
+    var w= workArea();
+    int right= w.x+w.width;
+    int bottom= w.y+w.height;
+    int x= Math.max(w.x, at.x);
+    int y= Math.max(w.y, at.y);
     var d= clamped(f.getWidth(), right-x, bottom-y);
     return new Rectangle(Math.min(x, right-d.width), Math.min(y, bottom-d.height), d.width, d.height);
     }
   private Rectangle resized(Point at){
     int right= pressBounds.x+pressBounds.width;
     int bottom= pressBounds.y+pressBounds.height;
-    var d= clamped(Math.max(right-at.x, (bottom-at.y)*(double)canvasW/canvasH), right-workArea.x, bottom-workArea.y);
+    var w= workArea();
+    var d= clamped(Math.max(right-at.x, (bottom-at.y)*(double)canvasW/canvasH), right-w.x, bottom-w.y);
     return new Rectangle(right-d.width, bottom-d.height, d.width, d.height);
     }
 
