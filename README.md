@@ -52,6 +52,16 @@ floating desk.
                              stays in 4 and is compacted.
     In every state the picture covers at least the min screen area.
 
+## KDE Plasma on Wayland
+
+Like COSMIC, KDE Plasma on Wayland (`XDG_CURRENT_DESKTOP` names KDE and
+`WAYLAND_DISPLAY` is set) tells no X11 client when a resize by its border
+ends: after a desk resize a desk window keeps its bands. A window it tiles to
+half the screen keeps the tile size after the swap button, with bands.
+KDE Plasma marks a borderless window that covers the height of the work area
+as maximized; the demo takes the maximized state into account only for a
+window with the desk border.
+
 ## COSMIC
 
 COSMIC (`XDG_CURRENT_DESKTOP` names it) is a floating desk that chooses the

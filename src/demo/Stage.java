@@ -215,7 +215,7 @@ final class Stage extends MouseAdapter{
     return Math.min(Math.sqrt(area*screen.width*screen.height*canvasW/canvasH), fitWidth(w.width, w.height));
     }
   private Dimension clamped(double w, int roomW, int roomH){ return size(Math.max(Math.min(w, fitWidth(roomW, roomH)), areaWidth(c.minArea()))); }
-  private boolean maximized(){ return (f.getExtendedState() & Frame.MAXIMIZED_BOTH) == Frame.MAXIMIZED_BOTH; }
+  private boolean maximized(){ return mode == Mode.decorated && (f.getExtendedState() & Frame.MAXIMIZED_BOTH) == Frame.MAXIMIZED_BOTH; }
   private String state(){ return (Desk.managed && mode == Mode.decorated ? "managed" : mode.toString())+(maximized() ? " maximized" : ""); }
 
   private void request(Dimension d){
@@ -243,9 +243,9 @@ final class Stage extends MouseAdapter{
     boolean deskWindow= mode == Mode.decorated && !maximized() && !Desk.managed;
     deskResized&= deskWindow;
     if (Desk.cosmic){ cosmicTick(deskWindow); }
-    else if (deskWindow && f.getSize().equals(restore.getSize())){ restore= f.getBounds(); }
+    else if (deskWindow && !unmaximized && (Desk.resizeUnseen || f.getSize().equals(restore.getSize()))){ restore= f.getBounds(); }
     boolean deskChose= !near(now.width, chosen.width) || !near(now.height, chosen.height);
-    if (!now.equals(lastSize) && deskChose){ deskResized|= deskWindow && !Desk.cosmic; request(now); }
+    if (!now.equals(lastSize) && deskChose){ deskResized|= deskWindow && !Desk.resizeUnseen; request(now); }
     lastSize= now;
     if (unmaximized && (Desk.cosmic ? sameSize(f.getBounds(), restore) : !Desk.down())){ unmaximized(); return; }
     if (deskResized && !Desk.down()){ compact(); }

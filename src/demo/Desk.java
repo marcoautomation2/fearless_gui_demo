@@ -28,6 +28,7 @@ final class Desk{
   static final boolean managed= System.getenv("SWAYSOCK") != null
     || Stream.of(Objects.requireNonNullElse(System.getenv("XDG_CURRENT_DESKTOP"), "").split(":")).map(d -> d.toLowerCase(Locale.ROOT)).anyMatch(List.of("hyprland", "sway", "i3")::contains);
   static final boolean cosmic= Stream.of(Objects.requireNonNullElse(System.getenv("XDG_CURRENT_DESKTOP"), "").split(":")).anyMatch("COSMIC"::equalsIgnoreCase);
+  static final boolean resizeUnseen= cosmic || System.getenv("WAYLAND_DISPLAY") != null && Stream.of(Objects.requireNonNullElse(System.getenv("XDG_CURRENT_DESKTOP"), "").split(":")).anyMatch("KDE"::equalsIgnoreCase);
   static Rectangle cosmicArea= cosmicGuess();
   private static Rectangle cosmicGuess(){
     var s= java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice().getDefaultConfiguration().getBounds();
