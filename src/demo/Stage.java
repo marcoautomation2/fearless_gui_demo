@@ -139,7 +139,7 @@ final class Stage extends MouseAdapter{
     mode= Mode.decorated;
     log("managed by the program");
     f.pack();
-    place(compacted(inset(fit(workArea(), areaWidth(c.screenArea())), f.getInsets())));
+    place(opening());
     minimum();
     opensFullScreen= c.opensAs() == Mode.fullScreen;
     f.setVisible(true);
@@ -169,7 +169,7 @@ final class Stage extends MouseAdapter{
         }
       case decorated -> {
         f.pack();
-        place(compacted(inset(r, f.getInsets())));
+        place(old == null ? opening() : compacted(inset(r, f.getInsets())));
         }
       }
     minimum();
@@ -179,6 +179,7 @@ final class Stage extends MouseAdapter{
     activating= replaced && !Desk.windows;
     if (replaced && Desk.windows){ old.dispose(); }
     }
+  private Rectangle opening(){ return fit(inset(workArea(), f.getInsets()), areaWidth(c.screenArea())); }
   private Rectangle workArea(){ return Desk.cosmic ? Desk.cosmicArea : inset(screen, Toolkit.getDefaultToolkit().getScreenInsets(gc)); }
   private static Rectangle inset(Rectangle r, Insets in){ return new Rectangle(r.x+in.left, r.y+in.top, r.width-in.left-in.right, r.height-in.top-in.bottom); }
   private static int within(int v, int low, int high){ return Math.max(low, Math.min(v, high)); }
@@ -263,34 +264,36 @@ final class Stage extends MouseAdapter{
     var now= surface.getSize();
     boolean deskWindow= mode == Mode.decorated && !maximized() && !Desk.managed;
     deskResized&= deskWindow;
-    if (Desk.cosmic){ cosmicTick(deskWindow); }
-    else if (deskWindow && !unmaximized && (Desk.resizeUnseen || sameSize(f.getBounds(), restore))){ restore= f.getBounds(); }
+    boolean fitted= Desk.cosmic && cosmicTick(deskWindow);
+    if (!Desk.cosmic && deskWindow && !unmaximized && (Desk.resizeUnseen || sameSize(f.getBounds(), restore))){ restore= f.getBounds(); }
     boolean deskChose= !near(now.width, chosen.width) || !near(now.height, chosen.height);
-    if (!now.equals(lastSize) && deskChose){ deskResized|= deskWindow && !Desk.resizeUnseen; request(now); }
+    if (!now.equals(lastSize) && deskChose && !fitted){ deskResized|= deskWindow && !Desk.resizeUnseen; request(now); }
+    if (Desk.managed && deskChose && now.width > 0){ chosen= new Dimension(); }
     lastSize= now;
     if (unmaximized && (Desk.cosmic ? sameSize(f.getBounds(), restore) : !Desk.down())){ unmaximized(); return; }
     if (deskResized && !Desk.down()){ compact(); }
     if (mode == Mode.fearless && translucent && c.pulse()){ f.setOpacity((float)(c.opacityFloor()+(1-c.opacityFloor())*(0.5+0.5*Math.cos((System.nanoTime()-t0)/0.5e9)))); }
     surface.repaint();
     }
-  private void cosmicTick(boolean deskWindow){
+  private boolean cosmicTick(boolean deskWindow){
     if (maximized()){
       var m= Desk.bounds(f);
       int top= Desk.cosmicArea.y;
       Desk.cosmicArea= new Rectangle(m.x, top, m.width, m.y+m.height-top);
       }
     if (deskWindow && !unmaximized && pending == null){ restore= f.getBounds(); }
-    if (pending == null || !Desk.managing(f) || Desk.fullScreen(f)){ return; }
+    if (pending == null || !Desk.managing(f) || Desk.fullScreen(f)){ return false; }
     var real= Desk.bounds(f);
-    if (real.equals(screen)){ return; }
+    if (real.equals(screen)){ return false; }
     var in= f.getInsets();
     var room= inset(workArea(), in);
     var d= clamped(pending.width-in.left-in.right, room.x+room.width-real.x, room.y+room.height-real.y);
     pending= null;
-    if (real.getSize().equals(d)){ return; }
+    if (real.getSize().equals(d)){ return false; }
     chosen= d;
     log("fitting the window in the work area");
     Desk.resize(f, d);
+    return true;
     }
   private Rectangle bounds(){ return Desk.cosmic ? outset(Desk.bounds(f)) : f.getBounds(); }
   private static boolean sameSize(Rectangle a, Rectangle b){ return near(a.width, b.width) && near(a.height, b.height); }
@@ -316,7 +319,7 @@ final class Stage extends MouseAdapter{
     var now= Desk.bounds(f);
     if (Desk.maximized(f)){ maxed= now; deskMaximized= true; return; }
     if (!deskMaximized){ seen= now; return; }
-    if (now.equals(maxed)){ return; }
+    if (now.equals(maxed) || Desk.down()){ return; }
     deskMaximized= false;
     if (now.x == seen.x && now.y == seen.y){ realize(Mode.fullScreen, "the desk's unmaximize"); return; }
     log("a title bar drag: the window stays a desk window");
